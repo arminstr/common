@@ -9,8 +9,11 @@
 
   <buildtool_depend>autoware_build_flags</buildtool_depend>
   <buildtool_depend>catkin</buildtool_depend>
+    <test_depend>rostest</test_depend>
 
   <depend>cmake_modules</depend>
   <depend>op_utility</depend>
   <depend>tinyxml</depend>
+  <depend>lanelet2_extension</depend>    	  
+  <depend>roslint</depend>
 </package>

@@ -48,240 +48,134 @@
 namespace PlannerHNS
 {
 
-class AutowareRoadNetwork
-{
-public:
-  vector_map_msgs::PointArray   points;
-  vector_map_msgs::LaneArray     lanes;
-  vector_map_msgs::NodeArray     nodes;
-  vector_map_msgs::StopLineArray   stoplines;
-  vector_map_msgs::DTLaneArray   dtlanes; //center lines
-  bool bPoints;
-  bool bLanes;
-  bool bNodes;
-  bool bStopLines;
-  bool bDtLanes;
-
-  AutowareRoadNetwork()
-  {
-    bPoints   = false;
-    bLanes    = false;
-    bStopLines   = false;
-    bDtLanes    = false;
-    bNodes     = false;
-  }
-};
-
-enum AUTOWARE_STATE_TYPE {AW_INITIAL_STATE, AW_WAITING_STATE, AW_FORWARD_STATE, AW_STOPPING_STATE, AW_EMERGENCY_STATE,
-  AW_TRAFFIC_LIGHT_STOP_STATE, AW_STOP_SIGN_STOP_STATE, AW_FOLLOW_STATE, AW_LANE_CHANGE_STATE, AW_OBSTACLE_AVOIDANCE_STATE, AW_FINISH_STATE};
-enum AUTOWARE_LIGHT_INDICATOR {AW_INDICATOR_LEFT, AW_INDICATOR_RIGHT, AW_INDICATOR_BOTH , AW_INDICATOR_NONE};
-enum AUTOWARE_SHIFT_POS {AW_SHIFT_POS_PP = 0x60, AW_SHIFT_POS_RR = 0x40, AW_SHIFT_POS_NN = 0x20,
-  AW_SHIFT_POS_DD = 0x10, AW_SHIFT_POS_BB = 0xA0, AW_SHIFT_POS_SS = 0x0f, AW_SHIFT_POS_UU = 0xff };
-
-class AutowareBehaviorState
-{
-public:
-  AUTOWARE_STATE_TYPE state;
-  double maxVelocity;
-  double minVelocity;
-  double stopDistance;
-  double followVelocity;
-  double followDistance;
-  AUTOWARE_LIGHT_INDICATOR indicator;
-
-  AutowareBehaviorState()
-  {
-    state = AW_INITIAL_STATE;
-    maxVelocity = 0;
-    minVelocity = 0;
-    stopDistance = 0;
-    followVelocity = 0;
-    followDistance = 0;
-    indicator  = AW_INDICATOR_NONE;
-  }
-};
-
-class AutowareVehicleState
-{
-public:
-  double speed;
-  double steer;
-  AUTOWARE_SHIFT_POS shift;
-
-  AutowareVehicleState()
-  {
-    speed = 0;
-    steer = 0;
-    shift = AW_SHIFT_POS_NN;
-  }
-};
-
-class AutowarePlanningParams
-{
-public:
-  double   maxSpeed;
-  double   minSpeed;
-  double   planningDistance;
-  double   microPlanDistance;
-  double   carTipMargin;
-  double   rollInMargin;
-  double   rollInSpeedFactor;
-  double   pathDensity;
-  double   rollOutDensity;
-  int   rollOutNumber;
-  double   horizonDistance;
-  double   minFollowingDistance;
-  double   maxFollowingDistance;
-  double   minDistanceToAvoid;
-  double   speedProfileFactor;
-
-  bool   enableLaneChange;
-  bool   enableSwerving;
-  bool   enableFollowing;
-  bool   enableHeadingSmoothing;
-  bool   enableTrafficLightBehavior;
-
-  AutowarePlanningParams()
-  {
-    maxSpeed             = 3;
-    minSpeed             = 0;
-    planningDistance         = 10000;
-    microPlanDistance         = 35;
-    carTipMargin          = 8.0;
-    rollInMargin          = 20.0;
-    rollInSpeedFactor        = 0.25;
-    pathDensity            = 0.25;
-    rollOutDensity          = 0.5;
-    rollOutNumber          = 4;
-    horizonDistance          = 120;
-    minFollowingDistance      = 35;
-    maxFollowingDistance      = 40;
-    minDistanceToAvoid        = 15;
-    speedProfileFactor        = 1.0;
-
-    enableHeadingSmoothing      = false;
-    enableSwerving           = false;
-    enableFollowing          = false;
-    enableTrafficLightBehavior    = false;
-    enableLaneChange         = false;
-  }
-};
-
 class ROSHelpers
 {
 public:
-  ROSHelpers();
-  virtual ~ROSHelpers();
+	ROSHelpers();
+	virtual ~ROSHelpers();
 
-  static void GetTransformFromTF(const std::string parent_frame, const std::string child_frame, tf::StampedTransform &transform);
+	static void getTransformFromTF(const std::string parent_frame, const std::string child_frame, tf::TransformListener& listener, tf::StampedTransform &transform);
 
-  static void ConvertFromAutowareCloudClusterObstaclesToPlannerH(const PlannerHNS::WayPoint& currState, const double& car_width,
-      const double& car_length, const autoware_msgs::CloudClusterArray& clusters,
-      std::vector<PlannerHNS::DetectedObject>& impObstacles, const double max_obj_size, const double& min_obj_size, const double& detection_radius,
-      const int& n_poly_quarters,const double& poly_resolution, int& nOriginalPoints, int& nContourPoints);
+	static void transformDetectedObjects(const std::string& src_frame, const std::string& dst_frame, const tf::StampedTransform& trans,
+			const autoware_msgs::DetectedObjectArray& input, autoware_msgs::DetectedObjectArray& transformed_input, bool bTransformBoundary = true);
 
-  static visualization_msgs::Marker CreateGenMarker(const double& x, const double& y, const double& z,const double& a,
-      const double& r, const double& g, const double& b, const double& scale, const int& id, const std::string& ns, const int& type);
+	static void ConvertFromAutowareCloudClusterObstaclesToPlannerH(const PlannerHNS::WayPoint& currState, const double& car_width,
+			const double& car_length, const autoware_msgs::CloudClusterArray& clusters,
+			std::vector<PlannerHNS::DetectedObject>& impObstacles, const double max_obj_size, const double& min_obj_size, const double& detection_radius,
+			const int& n_poly_quarters,const double& poly_resolution, int& nOriginalPoints, int& nContourPoints);
 
-  static void InitMatchingMarkers(const int& nMarkers, visualization_msgs::MarkerArray& connections);
+	static visualization_msgs::Marker CreateGenMarker(const double& x, const double& y, const double& z,const double& a,
+			const double& r, const double& g, const double& b, const double& scale, const int& id, const std::string& ns, const int& type);
 
-  static void ConvertMatchingMarkers(const std::vector<std::pair<PlannerHNS::WayPoint, PlannerHNS::WayPoint> >& match_list,
-      visualization_msgs::MarkerArray& tracked_traj_d, visualization_msgs::MarkerArray& tracked_traj, int start_id=0);
+	static void InitMatchingMarkers(const int& nMarkers, visualization_msgs::MarkerArray& connections);
 
-  static void InitMarkers(const int& nMarkers,
-      visualization_msgs::MarkerArray& centers,
-      visualization_msgs::MarkerArray& dirs,
-      visualization_msgs::MarkerArray& text_info,
-      visualization_msgs::MarkerArray& polygons,
-      visualization_msgs::MarkerArray& trajectories);
+	static void ConvertMatchingMarkers(const std::vector<std::pair<PlannerHNS::WayPoint, PlannerHNS::WayPoint> >& match_list,
+			visualization_msgs::MarkerArray& tracked_traj_d, visualization_msgs::MarkerArray& tracked_traj, int start_id=0);
 
-  static int ConvertTrackedObjectsMarkers(const PlannerHNS::WayPoint& currState, const std::vector<PlannerHNS::DetectedObject>& trackedObstacles,
-      visualization_msgs::MarkerArray& centers_d,
-      visualization_msgs::MarkerArray& dirs_d,
-      visualization_msgs::MarkerArray& text_info_d,
-      visualization_msgs::MarkerArray& polygons_d,
-      visualization_msgs::MarkerArray& tracked_traj_d,
-      visualization_msgs::MarkerArray& centers,
-      visualization_msgs::MarkerArray& dirs,
-      visualization_msgs::MarkerArray& text_info,
-      visualization_msgs::MarkerArray& polygons,
-      visualization_msgs::MarkerArray& tracked_traj);
+	static void InitMarkers(const int& nMarkers,
+			visualization_msgs::MarkerArray& centers,
+			visualization_msgs::MarkerArray& dirs,
+			visualization_msgs::MarkerArray& text_info,
+			visualization_msgs::MarkerArray& polygons,
+			visualization_msgs::MarkerArray& trajectories);
 
-  static void CreateCircleMarker(const PlannerHNS::WayPoint& _center, const double& radius, const int& start_id, visualization_msgs::Marker& circle_points);
+	static int ConvertTrackedObjectsMarkers(const PlannerHNS::WayPoint& currState, const std::vector<PlannerHNS::DetectedObject>& trackedObstacles,
+			visualization_msgs::MarkerArray& centers_d,
+			visualization_msgs::MarkerArray& dirs_d,
+			visualization_msgs::MarkerArray& text_info_d,
+			visualization_msgs::MarkerArray& polygons_d,
+			visualization_msgs::MarkerArray& tracked_traj_d,
+			visualization_msgs::MarkerArray& centers,
+			visualization_msgs::MarkerArray& dirs,
+			visualization_msgs::MarkerArray& text_info,
+			visualization_msgs::MarkerArray& polygons,
+			visualization_msgs::MarkerArray& tracked_traj);
 
-  static void InitPredMarkers(const int& nMarkers, visualization_msgs::MarkerArray& paths);
+	static void CreateCircleMarker(const PlannerHNS::WayPoint& _center, const double& radius, const double& r, const double& g, const double& b, const int& start_id, const std::string& name_space,visualization_msgs::Marker& circle_points);
 
-  static void InitCurbsMarkers(const int& nMarkers, visualization_msgs::MarkerArray& curbs);
+	static void TrajectorySelectedToMarkers(const std::vector<PlannerHNS::WayPoint>& path, const double& r_path, const double& g_path, const double& b_path, const double& r_circle,
+			const double& g_circle, const double& b_circle, const double& radius, visualization_msgs::MarkerArray& markerArray, int skip = 0);
 
-  static void ConvertPredictedTrajectoriesMarkers(std::vector<std::vector<PlannerHNS::WayPoint> >& paths,visualization_msgs::MarkerArray& path_markers, visualization_msgs::MarkerArray& path_markers_d);
+	static void TrajectorySelectedToCircles(const std::vector<PlannerHNS::WayPoint>& path, const double& r_path, const double& g_path, const double& b_path, const double& r_circle,
+			const double& g_circle, const double& b_circle, const double& radius, visualization_msgs::MarkerArray& markerArray, int skip = 0);
 
-  static void ConvertCurbsMarkers(const std::vector<PlannerHNS::DetectedObject>& curbs, visualization_msgs::MarkerArray& curbs_markers, visualization_msgs::MarkerArray& curbs_markers_d);
+	static void DrivingPathToMarkers(const std::vector<std::pair<PlannerHNS::WayPoint, PlannerHNS::PolygonShape> >& path, visualization_msgs::MarkerArray& markerArray);
 
-  static void TrajectoriesToMarkers(const std::vector<std::vector<std::vector<PlannerHNS::WayPoint> > >& paths, visualization_msgs::MarkerArray& markerArray);
+	static void InitPredMarkers(const int& nMarkers, visualization_msgs::MarkerArray& paths);
 
-  static void TrajectoriesToColoredMarkers(const std::vector<std::vector<PlannerHNS::WayPoint> >& paths,const std::vector<PlannerHNS::TrajectoryCost>& traj_costs, const int& iClosest, visualization_msgs::MarkerArray& markerArray);
+	static void InitCurbsMarkers(const int& nMarkers, visualization_msgs::MarkerArray& curbs);
 
-  static void InitCollisionPointsMarkers(const int& nMarkers, visualization_msgs::MarkerArray& col_points);
+	static void ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<PlannerHNS::WayPoint> >& paths,visualization_msgs::MarkerArray& path_markers, visualization_msgs::MarkerArray& path_markers_d);
 
-  static void ConvertCollisionPointsMarkers(const std::vector<PlannerHNS::WayPoint>& col_pointss, visualization_msgs::MarkerArray& collision_markers, visualization_msgs::MarkerArray& collision_markers_d);
+	static void ConvertCurbsMarkers(const std::vector<PlannerHNS::DetectedObject>& curbs, visualization_msgs::MarkerArray& curbs_markers, visualization_msgs::MarkerArray& curbs_markers_d);
 
-  static void InitPredParticlesMarkers(const int& nMarkers, visualization_msgs::MarkerArray& paths);
+	static void TrajectoriesToMarkers(const std::vector<std::vector<std::vector<PlannerHNS::WayPoint> > >& paths, visualization_msgs::MarkerArray& markerArray);
 
-  static void ConvertParticles(std::vector<PlannerHNS::WayPoint>& points, visualization_msgs::MarkerArray& part_mkrs, visualization_msgs::MarkerArray& part_markers_d);
+	static void TrajectoriesToColoredMarkers(const std::vector<std::vector<PlannerHNS::WayPoint> >& paths,const std::vector<PlannerHNS::TrajectoryCost>& traj_costs, const int& iClosest, visualization_msgs::MarkerArray& markerArray);
 
-  static void ConvertFromPlannerHToAutowarePathFormat(const std::vector<PlannerHNS::WayPoint>& path, const int& iStart,
-        autoware_msgs::Lane & trajectory);
+	static void InitCollisionPointsMarkers(const int& nMarkers, visualization_msgs::MarkerArray& col_points);
 
-  static void ConvertFromPlannerHRectangleToAutowareRviz(const std::vector<PlannerHNS::GPSPoint>& safety_rect,
-      visualization_msgs::Marker& marker);
+	static void ConvertCollisionPointsMarkers(const std::vector<PlannerHNS::WayPoint>& col_pointss, visualization_msgs::MarkerArray& collision_markers, visualization_msgs::MarkerArray& collision_markers_d);
 
-  static void ConvertFromPlannerHToAutowareVisualizePathFormat(const std::vector<PlannerHNS::WayPoint>& curr_path,
-      const std::vector<std::vector<std::vector<PlannerHNS::WayPoint> > >& paths, const PlannerHNS::LocalPlannerH& localPlanner,
-        visualization_msgs::MarkerArray& markerArray);
+	static void InitPredParticlesMarkers(const int& nMarkers, visualization_msgs::MarkerArray& paths, bool bOld = false);
 
-  static void ConvertFromPlannerHToAutowareVisualizePathFormat(const std::vector<std::vector<PlannerHNS::WayPoint> >& globalPaths, visualization_msgs::MarkerArray& markerArray);
+	static void ConvertParticles(std::vector<PlannerHNS::WayPoint>& points, visualization_msgs::MarkerArray& part_mkrs, visualization_msgs::MarkerArray& part_markers_d, bool bOld = false);
 
-  static void ConvertFromRoadNetworkToAutowareVisualizeMapFormat(const PlannerHNS::RoadNetwork& map,  visualization_msgs::MarkerArray& markerArray);
+	static void ConvertFromPlannerHToAutowarePathFormat(const std::vector<PlannerHNS::WayPoint>& path, const int& iStart,
+				autoware_msgs::Lane & trajectory);
 
-  static void ConvertFromAutowareBoundingBoxObstaclesToPlannerH(const jsk_recognition_msgs::BoundingBoxArray& detectedObstacles,
-      std::vector<PlannerHNS::DetectedObject>& impObstacles);
+	static void ConvertFromPlannerHRectangleToAutowareRviz(const std::vector<PlannerHNS::GPSPoint>& safety_rect,
+			visualization_msgs::Marker& marker);
 
-  static void ConvertFromPlannerObstaclesToAutoware(const PlannerHNS::WayPoint& currState, const std::vector<PlannerHNS::DetectedObject>& trackedObstacles,
-      visualization_msgs::MarkerArray& detectedPolygons);
+	static void ConvertFromPlannerHToAutowareVisualizePathFormat(const std::vector<PlannerHNS::WayPoint>& curr_path,
+			const std::vector<std::vector<std::vector<PlannerHNS::WayPoint> > >& paths, const PlannerHNS::LocalPlannerH& localPlanner,
+				visualization_msgs::MarkerArray& markerArray);
 
-  static void ConvertFromLocalLaneToAutowareLane(const std::vector<PlannerHNS::WayPoint>& path, autoware_msgs::Lane& trajectory , const unsigned int& iStart = 0);
+	static void ConvertFromPlannerHToAutowareVisualizePathFormat(const std::vector<std::vector<PlannerHNS::WayPoint> >& globalPaths, visualization_msgs::MarkerArray& markerArray);
 
-  static void ConvertFromLocalLaneToAutowareLane(const std::vector<PlannerHNS::GPSPoint>& path, autoware_msgs::Lane& trajectory);
+	static void ConvertFromRoadNetworkToAutowareVisualizeMapFormat(const PlannerHNS::RoadNetwork& map,	visualization_msgs::MarkerArray& markerArray, bool show_connections = false);
 
-  static void ConvertFromAutowareLaneToLocalLane(const autoware_msgs::Lane& trajectory, std::vector<PlannerHNS::WayPoint>& path);
+	static void ConvertFromAutowareBoundingBoxObstaclesToPlannerH(const jsk_recognition_msgs::BoundingBoxArray& detectedObstacles,
+			std::vector<PlannerHNS::DetectedObject>& impObstacles);
 
-  static void createGlobalLaneArrayMarker(std_msgs::ColorRGBA color, const autoware_msgs::LaneArray &lane_waypoints_array, visualization_msgs::MarkerArray& markerArray);
+	static void ConvertFromPlannerObstaclesToAutoware(const PlannerHNS::WayPoint& currState, const std::vector<PlannerHNS::DetectedObject>& trackedObstacles,
+			visualization_msgs::MarkerArray& detectedPolygons);
 
-  static void createGlobalLaneArrayVelocityMarker(const autoware_msgs::LaneArray &lane_waypoints_array , visualization_msgs::MarkerArray& markerArray);
+	static void ConvertFromLocalLaneToAutowareLane(const std::vector<PlannerHNS::WayPoint>& path, autoware_msgs::Lane& trajectory , const unsigned int& iStart = 0);
 
-  static void createGlobalLaneArrayOrientationMarker(const autoware_msgs::LaneArray &lane_waypoints_array , visualization_msgs::MarkerArray& markerArray);
+	static void ConvertFromLocalLaneToAutowareLane(const std::vector<PlannerHNS::GPSPoint>& path, autoware_msgs::Lane& trajectory);
 
-  static void GetTrafficLightForVisualization(std::vector<PlannerHNS::TrafficLight>& lights, visualization_msgs::MarkerArray& markerArray);
+	static void ConvertFromAutowareLaneToLocalLane(const autoware_msgs::Lane& trajectory, std::vector<PlannerHNS::WayPoint>& path);
 
-  static void ConvertFromAutowareDetectedObjectToOpenPlannerDetectedObject(const autoware_msgs::DetectedObject& det_obj, PlannerHNS::DetectedObject& obj);
+	static PlannerHNS::PID_CONST GetPIDValues(const std::string& str_param);
 
-  static void ConvertFromOpenPlannerDetectedObjectToAutowareDetectedObject(const PlannerHNS::DetectedObject& det_obj, const bool& bSimulationMode, autoware_msgs::DetectedObject& obj);
+	static void createGlobalLaneArrayMarker(std_msgs::ColorRGBA color, const autoware_msgs::LaneArray &lane_waypoints_array, visualization_msgs::MarkerArray& markerArray);
 
-  static PlannerHNS::SHIFT_POS ConvertShiftFromAutowareToPlannerH(const PlannerHNS::AUTOWARE_SHIFT_POS& shift);
+	static void createGlobalLaneArrayVelocityMarker(const autoware_msgs::LaneArray &lane_waypoints_array , visualization_msgs::MarkerArray& markerArray);
 
-  static PlannerHNS::AUTOWARE_SHIFT_POS ConvertShiftFromPlannerHToAutoware(const PlannerHNS::SHIFT_POS& shift);
+	static void createGlobalLaneArrayOrientationMarker(const autoware_msgs::LaneArray &lane_waypoints_array , visualization_msgs::MarkerArray& markerArray);
 
-  static PlannerHNS::AutowareBehaviorState ConvertBehaviorStateFromPlannerHToAutoware(const PlannerHNS::BehaviorState& beh);
+	static void GetTrafficLightForVisualization(std::vector<PlannerHNS::TrafficLight>& lights, visualization_msgs::MarkerArray& markerArray);
 
-  static std::string GetBehaviorNameFromCode(const PlannerHNS::STATE_TYPE& behState);
+	static void ConvertFromAutowareDetectedObjectToOpenPlannerDetectedObject(const autoware_msgs::DetectedObject& det_obj, PlannerHNS::DetectedObject& obj);
 
-  static void VisualizeBehaviorState(const PlannerHNS::WayPoint& currState, const PlannerHNS::BehaviorState& beh, const bool& bGreenLight, const int& avoidDirection, visualization_msgs::Marker& behaviorMarker, std::string ns,double size_factor = 1);
+	static void ConvertFromOpenPlannerDetectedObjectToAutowareDetectedObject(const PlannerHNS::DetectedObject& det_obj, const bool& bSimulationMode, autoware_msgs::DetectedObject& obj);
 
-  static void UpdateRoadMap(const AutowareRoadNetwork& src_map, PlannerHNS::RoadNetwork& out_map);
+	static std::string GetBehaviorNameFromCode(const PlannerHNS::STATE_TYPE& behState);
 
-  static void GetIndicatorArrows(const PlannerHNS::WayPoint& center, const double& width,const double& length, const PlannerHNS::LIGHT_INDICATOR& indicator, const int& id,visualization_msgs::MarkerArray& markerArray);
+	static void VisualizeBehaviorState(const PlannerHNS::WayPoint& currState, const PlannerHNS::BehaviorState& beh, const bool& bGreenLight, const int& avoidDirection, visualization_msgs::Marker& behaviorMarker, std::string ns,double size_factor = 1);
 
-  static void TTC_PathRviz(const std::vector<PlannerHNS::WayPoint>& path, visualization_msgs::MarkerArray& markerArray);
+	static void VisualizeIntentionState(const PlannerHNS::WayPoint& currState, const PlannerHNS::BEH_STATE_TYPE& beh, visualization_msgs::Marker& behaviorMarker, std::string ns,double size_factor = 1);
+
+	static void GetIndicatorArrows(const PlannerHNS::WayPoint& center, const double& width,const double& length, const PlannerHNS::LIGHT_INDICATOR& indicator, const int& id,visualization_msgs::MarkerArray& markerArray);
+
+	static void TTC_PathRviz(const std::vector<PlannerHNS::WayPoint>& path, visualization_msgs::MarkerArray& markerArray);
+
+	static autoware_msgs::Waypoint ConvertBehaviorStateToAutowareWaypoint(const PlannerHNS::BehaviorState& beh);
+
+	static PlannerHNS::BehaviorState ConvertAutowareWaypointToBehaviorState(const autoware_msgs::Waypoint& state_point);
+
+	static void CreateNextPlanningTreeLevelMarker(std::vector<PlannerHNS::WayPoint*>& level, visualization_msgs::MarkerArray& markerArray, PlannerHNS::WayPoint* pCurrGoal, double max_cost);
 };
 
 }

@@ -5,12 +5,15 @@ find_package(autoware_build_flags REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
-  vector_map_msgs 
-  vector_map_server
+	vector_map_msgs 
+	vector_map_server
 )
 
 find_package(TinyXML REQUIRED)
 
+###################################
+## catkin specific configuration ##
+###################################
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}

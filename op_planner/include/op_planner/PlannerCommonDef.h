@@ -14,151 +14,107 @@
 namespace PlannerHNS
 {
 
-enum MAP_SOURCE_TYPE
-{
-  MAP_AUTOWARE,
-  MAP_FOLDER,
-  MAP_KML_FILE,
-  MAP_ONE_CSV_FILE,
-  MAP_LANES_CSV_FILES
-};
-
-enum CAR_TYPE
-{
-  Mv2Car, //!< Mv2Car
-  PHVCar, //!< PHVCar
-  HVCar,  //!< HVCar
-  RoboCar,//!< RoboCar
-  SimulationCar
-};
+enum VEHICLE_TYPE {SMALL_VEHICLE,  NORMAL_VEHICLE,  MINI_VAN_VEHICLE,  BUS_VEHICLE,  ROBOT_VEHICLE };
 
 class PID_CONST
 {
 public:
-  double kP;
-  double kI;
-  double kD;
+	double kP;
+	double kI;
+	double kD;
 
-  PID_CONST()
-  {
-    kP = kI = kD = 0;
-  }
+	PID_CONST()
+	{
+		kP = kI = kD = 0;
+	}
 
-  PID_CONST(const double& p, const double& i, const double& d)
-  {
-    kP = p;
-    kI = i;
-    kD = d;
-  }
+	PID_CONST(const double& p, const double& i, const double& d)
+	{
+		kP = p;
+		kI = i;
+		kD = d;
+	}
 };
 
 class ControllerParams
 {
 public:
-  double SimulationSteeringDelay;
-  double SteeringDelay;
-  double minPursuiteDistance;
-  PID_CONST Steering_Gain;
-  PID_CONST Velocity_Gain;
-  double Acceleration;
-  double Deceleration;
-  double FollowDistance;
-  double LowpassSteerCutoff;
-  double maxAccel;
-  double maxDecel;
+	double SimulationSteeringDelay;
+	double SteeringDelay;
+	double minPursuiteDistance;
+	double LowpassSteerCutoff;
+	int ControlFrequency;
+	double avg_engine_brake_accel; // also could work as general friction or drag
+	double min_safe_follow_distance; // in follow mode, keep this distance to the object in front
+	PID_CONST Steering_Gain;
+	PID_CONST Velocity_Gain;
 
+	PID_CONST Torque_Gain;
+	PID_CONST Accel_Gain;
+	PID_CONST Brake_Gain;
+	PID_CONST Follow_Gain;
 
-  ControllerParams()
-  {
-    SimulationSteeringDelay = 0.0;
-    SteeringDelay     = 0.8;
-    Acceleration    = 0.5;
-    Deceleration    = -0.8;
-    FollowDistance    = 8.0;
-    LowpassSteerCutoff  = 5.0;
-    maxAccel      = 0.9;
-    minPursuiteDistance = 2.0;
-    maxDecel       = -1.5;
-  }
+	double accel_init_delay;
+	double accel_avg_delay;
+	double avg_acceleration;
+
+	double brake_init_delay;
+	double brake_avg_delay;
+	double avg_deceleration;
+
+	double accelPushRatio;
+	double brakePushRatio;
+
+	ControllerParams()
+	{
+		SimulationSteeringDelay = 0.0;
+		SteeringDelay = 0.8;
+		LowpassSteerCutoff = 5.0;
+		minPursuiteDistance = 2.0;
+		ControlFrequency = 25;
+		avg_engine_brake_accel = -0.5;
+		min_safe_follow_distance = 2.0;
+
+		accel_init_delay = 0.01;
+		accel_avg_delay = 0.01;
+		avg_acceleration = 1.0;
+
+		brake_init_delay = 0.01;
+		brake_avg_delay = 0.01;
+		avg_deceleration = -1.0;
+
+		accelPushRatio = 1.0;
+		brakePushRatio = 1.0;
+	}
 };
 
 class CAR_BASIC_INFO
 {
 public:
-  CAR_TYPE model;
+	VEHICLE_TYPE model = NORMAL_VEHICLE;
 
-  double turning_radius;
-  double wheel_base;
-  double max_speed_forward;
-  double min_speed_forward;
-  double max_speed_backword;
-  double max_steer_value;
-  double min_steer_value;
-  double max_brake_value;
-  double min_brake_value;
-  double max_steer_angle;
-  double min_steer_angle;
-  double length;
-  double width;
-  double max_acceleration;
-  double max_deceleration;
+  double turning_radius = 5.2; // meters
+  double wheel_base = 2.7; // meters
+  double length = 4.54; // meters
+  double width = 1.82; // meters
+  double front_length = 0.96;
+  double back_length = 0.89;
+  double height = 1.47;
 
-  CAR_BASIC_INFO()
-  {
-    model         = SimulationCar;
-    turning_radius     = 5.2;
-    wheel_base      = 2.7;
-    max_speed_forward    = 3.0;
-    min_speed_forward    = 0.0;
-    max_speed_backword  = 1.0;
-    max_steer_value    = 660;
-    min_steer_value    = -660;
-    max_brake_value    = 0;
-    min_brake_value    = 0;
-    max_steer_angle    = 0.42;
-    min_steer_angle    = 0.42;
-    length        = 4.3;
-    width          = 1.82;
-    max_acceleration    = 1.5; // m/s2
-    max_deceleration    = -1.5; // 1/3 G
-  }
+  double max_speed_forward = 10; // m/s
+  double min_speed_forward = 0.0; // m/s speed that is considered stopping, to avoid small speed noise
 
-  double CalcMaxSteeringAngle()
-  {
-    return  max_steer_angle;//asin(wheel_base/turning_radius);
-  }
+  double max_steer_value = 11.52; // radians, total steering wheel angle to the right, equivilent to 660
+  double max_wheel_angle = 0.42; // radians, max angle for the front wheel = asin(wheel_base/turning_radius);
 
-  double BoundSpeed(double s)
-  {
-  if(s > 0 && s > max_speed_forward)
-    return max_speed_forward;
-  if(s < 0 && s < max_speed_backword)
-    return max_speed_backword;
-  return s;
-  }
+  double max_accel_value = 100.0; // accel pedal stroke force
+  double max_brake_value = 100; // brake pedal stroke force
+  double max_steer_torque = 100; // steering torque force
+  double min_steer_torque = -100; // steering torque force
 
-  double BoundSteerAngle(double a)
-  {
-  if(a > max_steer_angle)
-    return max_steer_angle;
-  if(a < min_steer_angle)
-    return min_steer_angle;
-
-  return a;
-  }
-
-  double BoundSteerValue(double v)
-  {
-    if(v >= max_steer_value)
-    return max_steer_value;
-  if(v <= min_steer_value)
-    return min_steer_value;
-
-  return v;
-  }
-
+  double max_acceleration = 1.5; // m/s*s
+  double max_deceleration = -1.5; // m/s*s
 };
-
 
 } /* namespace PlannerHNS */
 
