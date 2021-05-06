@@ -216,7 +216,7 @@ void Lanelet2MapLoader::FromLaneletToRoadNetwork(lanelet::LaneletMapPtr l2_map, 
 			      }
 			    }
 
-			  std::vector<lanelet::ConstLineString3d> stop_lines = lanelet::utils::query::stopLinesLanelets(x_lets);
+			  std::vector<lanelet::ConstLineString3d> stop_lines = lanelet::utils::query::getTrafficLightStopLines(x_lets);
 			  for(unsigned int i=0; i < stop_lines.size(); i++)
 			  {
 				  lanelet::ConstLineString3d stop_line_points = stop_lines.at(i);
