@@ -11,6 +11,7 @@
 #include <string>
 #include <math.h>
 #include <vector>
+#include <tinyxml.h>
 
 
 namespace UtilityHNS
@@ -110,6 +111,20 @@ private:
 	double w1 ;
 	double w2 ;
 
+};
+
+class XmlHelpers
+{
+
+public:
+
+	static int findElements(std::string name, TiXmlElement* parent_element, std::vector<TiXmlElement*>& element_list);
+	static int findFirstElement(std::string name, TiXmlElement* parent_element, std::vector<TiXmlElement*>& element_list);
+	static int getIntAttribute(TiXmlElement* p_elem, std::string name, int def_val = 0);
+	static double getDoubleAttribute(TiXmlElement* p_elem, std::string name, double def_val = 0.0);
+	static std::string getStringAttribute(TiXmlElement* p_elem, std::string name, std::string def_val);
+	static std::string getStringValue(TiXmlElement* p_elem, std::string def_val);
+	static std::vector<std::string> splitString(const std::string& str, const std::string& token);
 };
 
 }

@@ -55,6 +55,8 @@ private:
 	void CreateWayPointsFromPolygon(const PlannerHNS::RoadNetwork& map, std::vector<PlannerHNS::WayPoint>& points,const lanelet::ConstPolygon3d& line_string, lanelet::Projector* proj, int lane_id = 0);
 	std::vector<PlannerHNS::TrafficLight> CreateTrafficLightsFromLanelet2(const PlannerHNS::RoadNetwork& map, lanelet::AutowareTrafficLightConstPtr& tl_let, lanelet::Projector* proj, int lane_id = 0);
 	std::vector<PlannerHNS::StopLine> CreateStopLinesFromLanelet2(const PlannerHNS::RoadNetwork& map, lanelet::ConstLineString3d& sl_let, lanelet::Projector* proj, int lane_id = 0);
+	void ExtractFirstLongLatFromFileAsOrigin(const std::string& fileName, PlannerHNS::RoadNetwork& map);
+	void CreateLane(lanelet::routing::RoutingGraphUPtr& routingGraph, lanelet::traffic_rules::TrafficRulesPtr& traffic, lanelet::ConstLanelet& lanelet_obj, PlannerHNS::Lane& l, PlannerHNS::RoadNetwork& map, lanelet::Projector* proj);
 
 };
 

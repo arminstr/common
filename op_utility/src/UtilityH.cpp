@@ -524,4 +524,104 @@ double LowpassFilter::getFilter(const double& value)
 }
 
 
+int XmlHelpers::findElements(std::string name, TiXmlElement* parent_element, std::vector<TiXmlElement*>& element_list)
+{
+	if(parent_element == nullptr)
+	{
+		return element_list.size();
+	}
+	else if(name.compare(parent_element->Value()) == 0)
+	{
+		element_list.push_back(parent_element);
+	}
+
+	findElements(name, parent_element->FirstChildElement(), element_list);
+	findElements(name, parent_element->NextSiblingElement(), element_list);
+
+	return element_list.size();
+}
+
+int XmlHelpers::findFirstElement(std::string name, TiXmlElement* parent_element, std::vector<TiXmlElement*>& element_list)
+{
+	if(parent_element == nullptr  || element_list.size()>0)
+	{
+		return element_list.size();
+	}
+
+	else if(name.compare(parent_element->Value()) == 0)
+	{
+		element_list.push_back(parent_element);
+		return element_list.size();
+	}
+
+	findFirstElement(name, parent_element->FirstChildElement(), element_list);
+	findFirstElement(name, parent_element->NextSiblingElement(), element_list);
+
+	return element_list.size();
+}
+
+int XmlHelpers::getIntAttribute(TiXmlElement* p_elem, std::string name, int def_val )
+{
+	if(p_elem != nullptr && p_elem->Attribute(name) != nullptr)
+		return strtol(p_elem->Attribute(name.c_str()), NULL, 10);
+	else
+		return def_val;
+}
+
+double XmlHelpers::getDoubleAttribute(TiXmlElement* p_elem, std::string name, double def_val )
+{
+	if(p_elem != nullptr && p_elem->Attribute(name) != nullptr)
+	{
+		return strtod(p_elem->Attribute(name.c_str()), NULL);
+	}
+	else
+		return def_val;
+}
+
+std::string XmlHelpers::getStringAttribute(TiXmlElement* p_elem, std::string name, std::string def_val)
+{
+	if(p_elem != nullptr && p_elem->Attribute(name) != nullptr)
+		return std::string(p_elem->Attribute(name.c_str()));
+	else
+		return def_val;
+}
+
+std::string XmlHelpers::getStringValue(TiXmlElement* p_elem, std::string def_val)
+{
+	if(p_elem != nullptr && p_elem->Value() != nullptr)
+		return p_elem->ValueStr();
+	else
+		return def_val;
+}
+
+std::vector<std::string> XmlHelpers::splitString(const std::string& str, const std::string& token)
+{
+	std::vector<std::string> str_parts;
+	int iFirstPart = str.find(token);
+	if(iFirstPart > 0)
+	{
+		str_parts.push_back(str.substr(0, iFirstPart));
+	}
+	else
+	{
+		str_parts.push_back(str.substr(0, str.size()));
+	}
+
+	while(iFirstPart >= 0)
+	{
+		iFirstPart++;
+		int iSecondPart = str.find(token, iFirstPart);
+		if(iSecondPart>0)
+		{
+			str_parts.push_back(str.substr(iFirstPart,iSecondPart - iFirstPart));
+		}
+		else
+		{
+			str_parts.push_back(str.substr(iFirstPart,str.size() - iFirstPart));
+		}
+		iFirstPart = iSecondPart;
+	}
+
+	return str_parts;
+}
 }

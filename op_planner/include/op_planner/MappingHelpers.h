@@ -178,6 +178,10 @@ public:
 	static void ShiftMapUsingIncr(RoadNetwork& map, const double& x_inc, const double& y_inc, const double& z_inc = 0);
 	static void ShiftMapItemsUsingIncr(std::vector<Lane>& lanes, std::vector<StopLine>& stop_lines, const double& x_inc, const double& y_inc, const double& z_inc = 0);
 	static void RotateMapUsingIncr(RoadNetwork& map, const double&  angle, const double& x_center, const double& y_center);
+	/**
+	 * This function is added to handle CARLA map issue
+	 */
+	static void ShiftStopLinesToMatchTrafficLights(RoadNetwork& map);
 
 
 	/**

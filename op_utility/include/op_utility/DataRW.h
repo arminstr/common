@@ -72,6 +72,84 @@ public:
 			const std::vector<std::string>& data_list);
 };
 
+class CSV_File_Reader_Base
+{
+protected:
+	std::ifstream* p_file_;
+	std::vector<std::string> headers_;
+	std::vector<std::string> data_titles_header_;
+	std::vector<std::vector<std::vector<std::string> > > all_data_;
+
+	void ReadHeaders()
+	{
+		if(!p_file_->is_open()) return;
+		std::string strLine;
+		headers_.clear();
+		if(!p_file_->eof())
+		{
+			getline(*p_file_, strLine);
+			headers_.push_back(strLine);
+			ParseHeaderLine(strLine);
+		}
+	}
+	void ParseHeaderLine(const std::string& header)
+	{
+		if(header.size()==0) return;
+
+		std::string innerToken;
+		std::istringstream str_stream(header);
+		data_titles_header_.clear();
+		while(getline(str_stream, innerToken, ','))
+		{
+			data_titles_header_.push_back(innerToken);
+		}
+	}
+
+	bool ReadSingleLine(std::vector<std::vector<std::string> >& line)
+	{
+		if(!p_file_->is_open() || p_file_->eof()) return false;
+
+			std::string strLine, innerToken;
+			line.clear();
+			getline(*p_file_, strLine);
+			std::istringstream str_stream(strLine);
+
+			std::vector<std::string> obj_part;
+
+			while(getline(str_stream, innerToken, ','))
+			{
+				obj_part.push_back(innerToken);
+			}
+
+			line.push_back(obj_part);
+			return true;
+	}
+
+public:
+	CSV_File_Reader_Base(const std::string& file_name)
+	{
+		p_file_ = new std::ifstream(file_name.c_str(), std::ios::in);
+		if(!p_file_->is_open())
+		{
+		  printf("\n Can't Open CSV File !, %s", file_name.c_str());
+		  return;
+		}
+
+		  p_file_->precision(16);
+
+		  ReadHeaders();
+	}
+
+	virtual ~CSV_File_Reader_Base()
+	{
+		if(p_file_->is_open())
+		{
+			p_file_->close();
+		}
+	}
+
+};
+
 class SimpleReaderBase
 {
 private:

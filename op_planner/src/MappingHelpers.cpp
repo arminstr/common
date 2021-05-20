@@ -2422,6 +2422,129 @@ void MappingHelpers::ShiftMapUsingIncr(RoadNetwork& map, const double& x_inc, co
 			p.pos.z += z_inc;
 		}
 	}
+
+	for(auto& l: map.lines)
+	{
+		for(auto& p: l.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+	}
+
+	for(auto& b: map.boundaries)
+	{
+		for(auto& p: b.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+
+		b.center.pos.x += x_inc;
+		b.center.pos.y += y_inc;
+		b.center.pos.z += z_inc;
+	}
+
+	for(auto& c: map.crossings)
+	{
+		for(auto& p: c.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+	}
+
+	for(auto& c: map.curbs)
+	{
+		for(auto& p: c.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+	}
+
+	for(auto& m: map.markings)
+	{
+		for(auto& p: m.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+	}
+
+	for(auto& s: map.signs)
+	{
+		for(auto& p: s.points)
+		{
+			p.pos.x += x_inc;
+			p.pos.y += y_inc;
+			p.pos.z += z_inc;
+		}
+		s.pose.pos.x += x_inc;
+		s.pose.pos.y += y_inc;
+		s.pose.pos.z += z_inc;
+	}
+
+	for(auto& s: map.trafficLights)
+	{
+		s.pose.pos.x += x_inc;
+		s.pose.pos.y += y_inc;
+		s.pose.pos.z += z_inc;
+	}
+}
+
+void MappingHelpers::ShiftStopLinesToMatchTrafficLights(RoadNetwork& map)
+{
+	for(auto& sl: map.stopLines)
+	{
+		PlannerHNS::Lane* pLane = GetLaneById(sl.laneId, map);
+
+		if(pLane != nullptr && sl.points.size() > 0 && sl.lightIds.size() > 0)
+		{
+			RelativeInfo sl_info;
+			PlanningHelpers::GetRelativeInfoLimited(pLane->points, sl.points.at(0), sl_info);
+			PlannerHNS::TrafficLight* pTL = nullptr;
+			for(auto& tl: map.trafficLights)
+			{
+				if(tl.id == sl.lightIds.at(0))
+				{
+					pTL = &tl;
+					break;
+				}
+			}
+
+			if(pTL != nullptr)
+			{
+				RelativeInfo tl_info;
+				PlanningHelpers::GetRelativeInfoLimited(pLane->points, pTL->pose, tl_info);
+
+				if(tl_info.bBefore) // move stop line
+				{
+					//std::cout << "SLID " << sl.id  << ", back d: " << sl_info.from_back_distance << ", front d: " << sl_info.to_front_distance << ", TLID: " << pTL->id << " ,back d: " << tl_info.from_back_distance << ", front d: " << tl_info.to_front_distance << std::endl;
+
+					for(auto& sl_point: sl.points)
+					{
+						RelativeInfo sl_point_info;
+						PlanningHelpers::GetRelativeInfoLimited(pLane->points, sl_point, sl_point_info);
+
+						sl_point.pos.x = tl_info.perp_point.pos.x + sl_point_info.perp_distance*cos(tl_info.perp_point.pos.a+M_PI_2);
+						sl_point.pos.y = tl_info.perp_point.pos.y + sl_point_info.perp_distance*sin(tl_info.perp_point.pos.a+M_PI_2);
+						sl_point.pos.z = tl_info.perp_point.pos.z;
+					}
+				}
+			}
+		}
+//		else
+//		{
+//			std::cout << "Problem with StopLine connection: lane pointer= " << pLane << std::endl;
+//		}
+
+	}
 }
 
 void MappingHelpers::ShiftMapUsingInternalOrigin(RoadNetwork& map)
