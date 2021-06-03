@@ -199,48 +199,31 @@ public:
   virtual ~RECTANGLE(){}
 };
 
-class PolygonShape
-{
+class PolygonShape {
 public:
-	std::vector<GPSPoint> points;
+  std::vector<GPSPoint> points;
 
-	inline int PointInsidePolygon(const PolygonShape& polygon,const GPSPoint& p)
-	{
-		int counter = 0;
-		  int i;
-		  double xinters;
-		  GPSPoint p1,p2;
-		  int N = polygon.points.size();
-		  if(N <=0 ) return -1;
-
-		  p1 = polygon.points.at(0);
-		  for (i=1;i<=N;i++)
-		  {
-		    p2 = polygon.points.at(i % N);
-
-		    if (p.y > MIN(p1.y,p2.y))
-		    {
-		      if (p.y <= MAX(p1.y,p2.y))
-		      {
-		        if (p.x <= MAX(p1.x,p2.x))
-		        {
-		          if (p1.y != p2.y)
-		          {
-		            xinters = (p.y-p1.y)*(p2.x-p1.x)/(p2.y-p1.y)+p1.x;
-		            if (p1.x == p2.x || p.x <= xinters)
-		              counter++;
-		          }
-		        }
-		      }
-		    }
-		    p1 = p2;
-		  }
-
-		  if (counter % 2 == 0)
-		    return 0;
-		  else
-		    return 1;
-	}
+  /**
+   * PNPOLY - Point Inclusion in Polygon Test
+   * https://wrf.ecse.rpi.edu//Research/Short_Notes/pnpoly.html
+   * @param polygon
+   * @param p Point to test
+   * @return int
+   */
+  inline int PointInsidePolygon(const PolygonShape &polygon,
+                                const GPSPoint &p) {
+    int i, j, c = 0;
+    for (i = 0, j = static_cast<int>(polygon.points.size()) - 1;
+         i < polygon.points.size(); j = i++) {
+      if (((polygon.points[i].y > p.y) != (polygon.points[j].y > p.y)) &&
+          (p.x < (polygon.points[j].x - polygon.points[i].x) *
+                         (p.y - polygon.points[i].y) /
+                         (polygon.points[j].y - polygon.points[i].y) +
+                     polygon.points[i].x))
+        c = !c;
+    }
+    return c;
+  }
 };
 
 class MapItem
