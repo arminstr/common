@@ -23,7 +23,6 @@ private:
 	double m_MaxWheelAngle;
 	double m_SteeringDelay;
 
-	WayPoint m_OdometryState;
 	double m_CurrentVelocity, m_CurrentVelocityD; //meter/second
 	double m_CurrentSteering, m_CurrentSteeringD; //radians
 	SHIFT_POS m_CurrentShift , m_CurrentShiftD;

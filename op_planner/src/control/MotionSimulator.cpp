@@ -60,10 +60,6 @@ void MotionSimulator::Init(const double& wheel_base, const double& max_wheel_ang
  void MotionSimulator::FirstLocalizeMe(const WayPoint& initCarPos)
  {
 	m_State = initCarPos;
-	m_OdometryState = initCarPos;
-	//m_OdometryState.pos.a = initCarPos.pos.a;
-	//m_OdometryState.pos.x = initCarPos.pos.x + (m_WheelBase/2.0 * cos(initCarPos.pos.a));
-	//m_OdometryState.pos.y = initCarPos.pos.y + (m_WheelBase/2.0 * sin(initCarPos.pos.a));
  }
 
 void MotionSimulator::SetSimulatedTargetOdometryReadings(const double& velocity_d, const double& steering_d, const SHIFT_POS& shift_d)
@@ -75,28 +71,21 @@ void MotionSimulator::SetSimulatedTargetOdometryReadings(const double& velocity_
 
 void MotionSimulator::LocalizeMe(const double& dt)
 {
-	 WayPoint currPose = m_State;
-
 	if(m_CurrentShift == SHIFT_POS_DD)
 	{
-		m_OdometryState.pos.x +=  m_CurrentVelocity * dt * cos(currPose.pos.a);
-		m_OdometryState.pos.y +=  m_CurrentVelocity * dt * sin(currPose.pos.a);
-		m_OdometryState.pos.a +=  m_CurrentVelocity * dt * tan(m_CurrentSteering)  / m_WheelBase;
+		m_State.pos.a += m_CurrentVelocity * dt * tan(m_CurrentSteering)  / m_WheelBase;
+		m_State.pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(sin(m_State.pos.a), cos(m_State.pos.a)));
+		m_State.pos.x += m_CurrentVelocity * dt * cos(m_State.pos.a);
+		m_State.pos.y += m_CurrentVelocity * dt * sin(m_State.pos.a);
 
 	}
 	else if(m_CurrentShift == SHIFT_POS_RR )
 	{
-		m_OdometryState.pos.x += -m_CurrentVelocity * dt * cos(currPose.pos.a);
-		m_OdometryState.pos.y += -m_CurrentVelocity * dt * sin(currPose.pos.a);
-		m_OdometryState.pos.a += -m_CurrentVelocity * dt * tan(m_CurrentSteering);
+		m_State.pos.a -= m_CurrentVelocity * dt * tan(m_CurrentSteering)  / m_WheelBase;
+		m_State.pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(sin(m_State.pos.a), cos(m_State.pos.a)));
+		m_State.pos.x -= m_CurrentVelocity * dt * cos(m_State.pos.a);
+		m_State.pos.y -= m_CurrentVelocity * dt * sin(m_State.pos.a);
 	}
-
-	m_OdometryState.pos.a = atan2(sin(m_OdometryState.pos.a), cos(m_OdometryState.pos.a));
-	m_OdometryState.pos.a = UtilityHNS::UtilityH::FixNegativeAngle(m_OdometryState.pos.a);
-
-	m_State.pos.a = m_OdometryState.pos.a;
-	m_State.pos.x = m_OdometryState.pos.x - (m_CurrentVelocity*dt* (m_WheelBase) * cos (m_OdometryState.pos.a));
-	m_State.pos.y = m_OdometryState.pos.y - (m_CurrentVelocity*dt* (m_WheelBase/2.0) * sin (m_OdometryState.pos.a));
 }
 
  void MotionSimulator::UpdateState(const double& dt, const PlannerHNS::VehicleState& state)
