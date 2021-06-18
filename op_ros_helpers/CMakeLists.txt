@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   libwaypoint_follower
   autoware_msgs
   vector_map_msgs
+  lanelet2_extension
 )
 
 catkin_package(
@@ -49,6 +50,7 @@ include_directories(
 set(ROS_HELPERS_SRC
   src/PolygonGenerator.cpp
   src/op_ROSHelpers.cpp
+  src/ROSMapHandler.cpp
 )
 
 ## Declare a cpp library

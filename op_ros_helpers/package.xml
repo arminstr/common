@@ -23,4 +23,5 @@
   <depend>tf</depend>
   <depend>vector_map_msgs</depend>
   <depend>libwaypoint_follower</depend>
+  <depend>lanelet2_extension</depend>
 </package>
