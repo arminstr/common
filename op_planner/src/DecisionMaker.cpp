@@ -624,8 +624,6 @@ void DecisionMaker::InitBehaviorStates()
 
 		desiredVelocity = deceleration_critical * dt + CurrStatus.speed;
 
-		desiredVelocity = 0; //for CARLA
-
 		//std::cout << "Stopping : V: " << CurrStatus.speed << ", A: " << deceleration_critical << ", dt: " << dt << std::endl;
 		//std::cout << "Stopping (beh, brake): (" << beh.stopDistance << ", " << preCalcPrams->minStoppingDistance << ") , desiredPID=" << desiredVelocity << ", To Goal: " << preCalcPrams->distanceToGoal <<  std::endl;
 	}
@@ -654,8 +652,6 @@ void DecisionMaker::InitBehaviorStates()
 			desiredVelocity = CurrStatus.speed;
 
 
-		desiredVelocity = 0; // for CARLA
-
 		//std::cout << "Following V: " << CurrStatus.speed << ", Desired V: " << beh.followVelocity << ", A: " << deceleration_critical << ", d_to_stop: " << distance_to_stop << ", sudden_stop_d" << sudden_stop_distance << std::endl;
 		//std::cout << "Desired Vel: " << desiredVelocity << std::endl;
 
@@ -670,13 +666,7 @@ void DecisionMaker::InitBehaviorStates()
 
 		desiredVelocity = (acceleration_critical * dt) + CurrStatus.speed;
 
-		//For CARLA
-//		if(m_pCurrentBehaviorState->GetCalcParams()->iCurrSafeTrajectory != m_pCurrentBehaviorState->GetCalcParams()->iCentralTrajectory)
-//		{
-//			desiredVelocity  = max_velocity * 0.75;
-//		}
-//		else
-			desiredVelocity  = max_velocity;
+		desiredVelocity  = max_velocity;
 
 		//std::cout << "bEnd : " << preCalcPrams->bFinalLocalTrajectory << ", Min D: " << preCalcPrams->minStoppingDistance << ", D To Goal: " << preCalcPrams->distanceToGoal << std::endl;
 		//std::cout << "Forward: dt" << dt << " ,Target vel: " << desiredVelocity << ", Acc: " << acceleration_critical << ", Max Vel: " << max_velocity << ", Curr Vel: " << CurrStatus.speed << ", break_d: " << m_params.additionalBrakingDistance  << std::endl;

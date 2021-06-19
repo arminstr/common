@@ -13,8 +13,6 @@
 #include "tinyxml.h"
 #include "PlannerCommonDef.h"
 
-#define DISABLE_CARLA_SPECIAL_CODE
-
 namespace PlannerHNS {
 
 #define distance2points(from , to) sqrt(pow(to.x - from.x, 2) + pow(to.y - from.y, 2))
