@@ -20,7 +20,7 @@ VelocityHandler::~VelocityHandler()
 
 }
 
-void VelocityHandler::SubscribeToVelMsgs(ros::NodeHandle& nh, const PlannerHNS::CAR_BASIC_INFO& car_info, PlannerHNS::VehicleState* vehicle_status, PlannerHNS::WayPoint* curr_pose)
+void VelocityHandler::InitVelocityHandler(ros::NodeHandle& nh, const PlannerHNS::CAR_BASIC_INFO& car_info, PlannerHNS::VehicleState* vehicle_status, PlannerHNS::WayPoint* curr_pose)
 {
 	m_pVehicleState = vehicle_status;
 	m_pCurrentPose = curr_pose;

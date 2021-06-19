@@ -40,7 +40,7 @@ private:
 public:
 	VelocityHandler();
 	virtual ~VelocityHandler();
-	void SubscribeToVelMsgs(ros::NodeHandle& nh, const PlannerHNS::CAR_BASIC_INFO& car_info, PlannerHNS::VehicleState* vehicle_status, PlannerHNS::WayPoint* curr_pose);
+	void InitVelocityHandler(ros::NodeHandle& nh, const PlannerHNS::CAR_BASIC_INFO& car_info, PlannerHNS::VehicleState* vehicle_status, PlannerHNS::WayPoint* curr_pose);
 };
 
 } /* namespace PlannerHNS */
