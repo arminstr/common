@@ -32,28 +32,15 @@ bool MapHandler::IsMapLoaded()
 	return m_bMap;
 }
 
-void MapHandler::SubscribeToMapMsgs(ros::NodeHandle& nh)
+void MapHandler::InitMapHandler(ros::NodeHandle& nh, const std::string& source_topic, const std::string& map_path_topic, const std::string& map_origin_topic)
 {
-	sub_map_file_name = nh.subscribe("/assure_kml_map_file_name", 1, &MapHandler::callbackGetkmlMapFileName, this);
-	sub_bin_map = nh.subscribe("/lanelet_map_bin", 1, &MapHandler::callbackGetLanelet2, this);
-	sub_lanes = nh.subscribe("/vector_map_info/lane", 1, &MapHandler::callbackGetVMLanes,  this);
-	sub_points = nh.subscribe("/vector_map_info/point", 1, &MapHandler::callbackGetVMPoints,  this);
-	sub_dt_lanes = nh.subscribe("/vector_map_info/dtlane", 1, &MapHandler::callbackGetVMdtLanes,  this);
-	sub_intersect = nh.subscribe("/vector_map_info/cross_road", 1, &MapHandler::callbackGetVMIntersections,  this);
-	sup_area = nh.subscribe("/vector_map_info/area", 1, &MapHandler::callbackGetVMAreas,  this);
-	sub_lines = nh.subscribe("/vector_map_info/line", 1, &MapHandler::callbackGetVMLines,  this);
-	sub_stop_line = nh.subscribe("/vector_map_info/stop_line", 1, &MapHandler::callbackGetVMStopLines,  this);
-	sub_signals = nh.subscribe("/vector_map_info/signal", 1, &MapHandler::callbackGetVMSignal,  this);
-	sub_vectors = nh.subscribe("/vector_map_info/vector", 1, &MapHandler::callbackGetVMVectors,  this);
-	sub_curbs = nh.subscribe("/vector_map_info/curb", 1, &MapHandler::callbackGetVMCurbs,  this);
-	sub_edges = nh.subscribe("/vector_map_info/road_edge", 1, &MapHandler::callbackGetVMRoadEdges,  this);
-	sub_way_areas = nh.subscribe("/vector_map_info/way_area", 1, &MapHandler::callbackGetVMWayAreas,  this);
-	sub_cross_walk = nh.subscribe("/vector_map_info/cross_walk", 1, &MapHandler::callbackGetVMCrossWalks,  this);
-	sub_nodes = nh.subscribe("/vector_map_info/node", 1, &MapHandler::callbackGetVMNodes,  this);
-}
+	std::string str_map_path;
+	nh.getParam(map_path_topic , m_MapPath);
+	int iSource = 0;
+	nh.getParam(source_topic, iSource);
+	std::string str_origin;
+	nh.getParam(map_origin_topic , str_origin);
 
-void MapHandler::UpdateMapTypeParams(int iSource, std::string& mapPath, std::string& str_origin)
-{
 	if(iSource == 0)
 	{
 		m_MapType = PlannerHNS::MAP_AUTOWARE;
@@ -82,7 +69,22 @@ void MapHandler::UpdateMapTypeParams(int iSource, std::string& mapPath, std::str
 		m_MapType = PlannerHNS::MAP_KML_FILE_NAME;
 	}
 
-	m_MapPath = mapPath;
+	sub_map_file_name = nh.subscribe("/assure_kml_map_file_name", 1, &MapHandler::callbackGetkmlMapFileName, this);
+	sub_bin_map = nh.subscribe("/lanelet_map_bin", 1, &MapHandler::callbackGetLanelet2, this);
+	sub_lanes = nh.subscribe("/vector_map_info/lane", 1, &MapHandler::callbackGetVMLanes,  this);
+	sub_points = nh.subscribe("/vector_map_info/point", 1, &MapHandler::callbackGetVMPoints,  this);
+	sub_dt_lanes = nh.subscribe("/vector_map_info/dtlane", 1, &MapHandler::callbackGetVMdtLanes,  this);
+	sub_intersect = nh.subscribe("/vector_map_info/cross_road", 1, &MapHandler::callbackGetVMIntersections,  this);
+	sup_area = nh.subscribe("/vector_map_info/area", 1, &MapHandler::callbackGetVMAreas,  this);
+	sub_lines = nh.subscribe("/vector_map_info/line", 1, &MapHandler::callbackGetVMLines,  this);
+	sub_stop_line = nh.subscribe("/vector_map_info/stop_line", 1, &MapHandler::callbackGetVMStopLines,  this);
+	sub_signals = nh.subscribe("/vector_map_info/signal", 1, &MapHandler::callbackGetVMSignal,  this);
+	sub_vectors = nh.subscribe("/vector_map_info/vector", 1, &MapHandler::callbackGetVMVectors,  this);
+	sub_curbs = nh.subscribe("/vector_map_info/curb", 1, &MapHandler::callbackGetVMCurbs,  this);
+	sub_edges = nh.subscribe("/vector_map_info/road_edge", 1, &MapHandler::callbackGetVMRoadEdges,  this);
+	sub_way_areas = nh.subscribe("/vector_map_info/way_area", 1, &MapHandler::callbackGetVMWayAreas,  this);
+	sub_cross_walk = nh.subscribe("/vector_map_info/cross_walk", 1, &MapHandler::callbackGetVMCrossWalks,  this);
+	sub_nodes = nh.subscribe("/vector_map_info/node", 1, &MapHandler::callbackGetVMNodes,  this);
 }
 
 void MapHandler::LoadMap(RoadNetwork& map, bool bEnableLaneChange)

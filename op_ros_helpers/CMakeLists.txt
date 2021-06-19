@@ -51,6 +51,7 @@ set(ROS_HELPERS_SRC
   src/PolygonGenerator.cpp
   src/op_ROSHelpers.cpp
   src/ROSMapHandler.cpp
+  src/ROSVelocityHandler.cpp
 )
 
 ## Declare a cpp library

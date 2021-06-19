@@ -81,8 +81,7 @@ private:
 public:
 	MapHandler();
 	virtual ~MapHandler();
-	void SubscribeToMapMsgs(ros::NodeHandle& nh);
-	void UpdateMapTypeParams(int iSource, std::string& mapPath, std::string& str_origin);
+	void InitMapHandler(ros::NodeHandle& nh, const std::string& source_topic, const std::string& map_path_topic, const std::string& map_origin_topic);
 	bool IsMapLoaded();
 	void LoadMap(RoadNetwork& map, bool bEnableLaneChange);
 };
