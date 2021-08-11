@@ -17,9 +17,9 @@ find_package(catkin REQUIRED COMPONENTS
   op_simu
   libwaypoint_follower
   autoware_msgs
-  autoware_can_msgs
   vector_map_msgs
   lanelet2_extension
+  autoware_can_msgs
 )
 
 catkin_package(
@@ -28,7 +28,6 @@ catkin_package(
   CATKIN_DEPENDS
   geometry_msgs
   autoware_msgs
-  autoware_can_msgs
   map_file
   pcl_conversions
   pcl_ros

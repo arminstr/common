@@ -77,6 +77,7 @@ private:
 	void callbackGetVMCrossWalks(const vector_map_msgs::CrossWalkArray& msg);
 	void callbackGetVMNodes(const vector_map_msgs::NodeArray& msg);
 	void LoadKmlMap(const std::string& file_name, RoadNetwork& map);
+	void LoadOpenDriveMap(const std::string& file_name, RoadNetwork& map);
 
 public:
 	MapHandler();

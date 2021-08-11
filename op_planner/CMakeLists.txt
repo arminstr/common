@@ -56,12 +56,29 @@ set(PLANNERH_SRC
 	src/TrajectoryDynamicCosts.cpp
 	src/TrajectoryEvaluator.cpp
 	src/KmlMapLoader.cpp
+	src/OpenDriveMapLoader.cpp
 	src/VectorMapLoader.cpp
 	src/Lanelet2MapLoader.cpp
 	src/RoadNetwork.cpp
 	src/hmi/HMIMSG.cpp
 	src/control/op_controller.cpp
 	src/control/MotionSimulator.cpp	
+	src/opendrive/parser/GeometryParser.cpp
+	src/opendrive/parser/pugixml.cpp
+	src/opendrive/parser/GeoReferenceParser.cpp
+	src/opendrive/parser/JunctionParser.cpp
+	src/opendrive/parser/LaneParser.cpp
+	src/opendrive/parser/OpenDriveParser.cpp
+	src/opendrive/parser/ProfilesParser.cpp
+	src/opendrive/parser/RoadLinkParser.cpp
+	src/opendrive/parser/TrafficGroupParser.cpp
+	src/opendrive/parser/TrafficSignalsParser.cpp
+	src/opendrive/parser/TrafficSignParser.cpp
+	src/opendrive/geometry/CenterLine.cpp
+	src/opendrive/geometry/Geometry.cpp
+	src/opendrive/geometry/GeometryGenerator.cpp
+	src/opendrive/geometry/LaneUtils.cpp
+
 )
 
 ## Declare a cpp library
@@ -73,9 +90,11 @@ target_link_libraries(${PROJECT_NAME}
 	${catkin_LIBRARIES} ${TinyXML_LIBRARIES} ${PROJ_LIBRARY}
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
+install(DIRECTORY 
+	include/${PROJECT_NAME}/
+	include/${PROJECT_NAME}/opendrive/
 	DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-	FILES_MATCHING PATTERN "*.h"
+	##FILES_MATCHING PATTERN "*.h"
 )
 
 install(TARGETS op_planner

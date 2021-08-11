@@ -103,6 +103,7 @@ visualization_msgs::Marker ROSHelpers::CreateGenMarker(const double& x, const do
 	mkr.header.stamp = ros::Time();
 	mkr.ns = ns;
 	mkr.type = type;
+	mkr.lifetime = ros::Duration(0.1); // make old path disappear
 	mkr.action = visualization_msgs::Marker::ADD;
 	if(type != visualization_msgs::Marker::LINE_LIST && type != visualization_msgs::Marker::LINE_STRIP && type != visualization_msgs::Marker::TEXT_VIEW_FACING)
 	{
@@ -673,6 +674,129 @@ void ROSHelpers::ConvertFromRoadNetworkToAutowareVisualizeMapFormat(const Planne
 		  markerArray.markers.push_back(lane_waypoint_marker);
 		}
 	}
+
+	// visualization_msgs::Marker lane_heading_marker;
+	// lane_heading_marker.header.frame_id = "map";
+	// //lane_waypoint_marker.header.stamp = ros::Time();
+	// lane_heading_marker.ns = "road_network_vector_map";
+	// lane_heading_marker.type = visualization_msgs::Marker::ARROW;
+	// lane_heading_marker.action = visualization_msgs::Marker::ADD;
+	// lane_heading_marker.scale.x = 0.5;
+	// lane_heading_marker.scale.y = 0.1;
+	// lane_heading_marker.scale.z = 0.1;
+
+	// roll_color.r = 0.0;
+	// roll_color.g = 0.9;
+	// roll_color.b = 0.0;
+	// roll_color.a = 1.0;
+
+	// for(unsigned int i = 0; i< map.roadSegments.size(); i++)
+	// {
+	// 	for(unsigned int j = 0; j < map.roadSegments.at(i).Lanes.size(); j++)
+	// 	{
+	// 		for(unsigned int p = 0; p < map.roadSegments.at(i).Lanes.at(j).points.size(); p++)
+	// 	  	{
+	// 			lane_heading_marker.id = marker_id++;
+
+	// 			lane_heading_marker.pose.position.x = map.roadSegments.at(i).Lanes.at(j).points.at(p).pos.x;
+	// 			lane_heading_marker.pose.position.y = map.roadSegments.at(i).Lanes.at(j).points.at(p).pos.y;
+	// 			lane_heading_marker.pose.position.z = map.roadSegments.at(i).Lanes.at(j).points.at(p).pos.z;
+
+	// 			lane_heading_marker.pose.orientation.x = map.roadSegments.at(i).Lanes.at(j).points.at(p).rot.x;
+	// 			lane_heading_marker.pose.orientation.y = map.roadSegments.at(i).Lanes.at(j).points.at(p).rot.y;
+	// 			lane_heading_marker.pose.orientation.z = map.roadSegments.at(i).Lanes.at(j).points.at(p).rot.z;
+	// 			lane_heading_marker.pose.orientation.w = map.roadSegments.at(i).Lanes.at(j).points.at(p).rot.w;
+
+	// 			lane_heading_marker.color = roll_color;
+	// 			markerArray.markers.push_back(lane_heading_marker);
+	// 		}
+	// 	}
+	// }
+
+	visualization_msgs::Marker laneID_text_marker;
+	laneID_text_marker.header.frame_id = "map";
+	//lane_waypoint_marker.header.stamp = ros::Time();
+	laneID_text_marker.ns = "road_network_vector_map";
+	laneID_text_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+	laneID_text_marker.action = visualization_msgs::Marker::ADD;
+	laneID_text_marker.scale.z = 0.5;
+
+	roll_color.r = 1;
+	roll_color.g = 1;
+	roll_color.b = 1;
+	roll_color.a = 1.0;
+
+	for(unsigned int i = 0; i< map.roadSegments.size(); i++)
+	{
+		for(unsigned int j = 0; j < map.roadSegments.at(i).Lanes.size(); j++)
+		{
+			laneID_text_marker.id = marker_id++;
+
+			int labelIndex =  map.roadSegments.at(i).Lanes.at(j).points.size() / 2;
+
+			laneID_text_marker.pose.position.x = map.roadSegments.at(i).Lanes.at(j).points.at(labelIndex).pos.x;
+			laneID_text_marker.pose.position.y = map.roadSegments.at(i).Lanes.at(j).points.at(labelIndex).pos.y;
+			laneID_text_marker.pose.position.z = map.roadSegments.at(i).Lanes.at(j).points.at(labelIndex).pos.z;
+
+			char buffer [50];
+			sprintf (buffer, "LANE ID: %d", map.roadSegments.at(i).Lanes.at(j).id);
+
+			laneID_text_marker.text = buffer;
+
+			laneID_text_marker.color = roll_color;
+			markerArray.markers.push_back(laneID_text_marker);
+		}
+	}
+
+	visualization_msgs::Marker trafficLightID_marker;
+	trafficLightID_marker.header.frame_id = "map";
+	//lane_waypoint_marker.header.stamp = ros::Time();
+	trafficLightID_marker.ns = "road_network_vector_map";
+	trafficLightID_marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+	trafficLightID_marker.action = visualization_msgs::Marker::ADD;
+	trafficLightID_marker.scale.z = 0.5;
+
+	roll_color.r = 1;
+	roll_color.g = 1;
+	roll_color.b = 1;
+	roll_color.a = 1.0;
+
+	
+
+	for(unsigned int j = 0; j < map.trafficLights.size(); j++)
+	{
+
+		if(map.trafficLights.at(j).lightType == RED_LIGHT)
+		{
+			roll_color.r = 1;
+			roll_color.g = 0;
+			roll_color.b = 0;
+			roll_color.a = 1.0;
+		}
+		else if(map.trafficLights.at(j).lightType == GREEN_LIGHT)
+		{
+			roll_color.r = 0;
+			roll_color.g = 1;
+			roll_color.b = 0;
+			roll_color.a = 1.0;
+			
+		}
+		trafficLightID_marker.id = marker_id++;
+
+		trafficLightID_marker.pose.position.x = map.trafficLights.at(j).pose.pos.x;
+		trafficLightID_marker.pose.position.y = map.trafficLights.at(j).pose.pos.y;
+		trafficLightID_marker.pose.position.z = map.trafficLights.at(j).pose.pos.z;
+
+		char buffer [50];
+		sprintf (buffer, "TrafficLight ID: %d\n(LANE %d)", map.trafficLights.at(j).id, map.trafficLights.at(j).laneIds.at(0));
+
+		trafficLightID_marker.text = buffer;
+
+
+		trafficLightID_marker.color = roll_color;
+		markerArray.markers.push_back(trafficLightID_marker);
+	}
+
 
 	if(show_connections && map.roadSegments.size() > 0)
 	{

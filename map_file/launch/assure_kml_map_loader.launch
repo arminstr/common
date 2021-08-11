@@ -1,0 +1,6 @@
+<launch>
+ <arg name="kml_map_file_name"/>	
+ 
+ <node pkg="rostopic" type="rostopic" name="assure_kml_map" args="pub /assure_kml_map_file_name std_msgs/String $(arg kml_map_file_name)"/>
+ 
+</launch>

@@ -10,6 +10,7 @@
 #include "op_planner/KmlMapLoader.h"
 #include "op_planner/Lanelet2MapLoader.h"
 #include "op_planner/VectorMapLoader.h"
+#include "op_planner/OpenDriveMapLoader.h"
 
 namespace PlannerHNS
 {
@@ -68,6 +69,11 @@ void MapHandler::InitMapHandler(ros::NodeHandle& nh, const std::string& source_t
 	{
 		m_MapType = PlannerHNS::MAP_KML_FILE_NAME;
 	}
+	else if(iSource == 6)
+	{
+		m_MapType = PlannerHNS::MAP_OPEN_DRIVE_FILE;
+		// sub_map_file_name = nh.subscribe("/commonroad_opendrive_map_file_name", 1, &GlobalPlanner::opendriveMapFileNameCallback, this);
+	}
 
 	sub_map_file_name = nh.subscribe("/assure_kml_map_file_name", 1, &MapHandler::callbackGetkmlMapFileName, this);
 	sub_bin_map = nh.subscribe("/lanelet_map_bin", 1, &MapHandler::callbackGetLanelet2, this);
@@ -100,6 +106,10 @@ void MapHandler::LoadMap(RoadNetwork& map, bool bEnableLaneChange)
 	else if(m_MapType == PlannerHNS::MAP_KML_FILE_NAME && m_bKmlMapFileNameReceived)
 	{
 		LoadKmlMap(m_MapFileName, map);
+	}
+	else if(m_MapType == PlannerHNS::MAP_OPEN_DRIVE_FILE)
+	{
+		LoadOpenDriveMap(m_MapPath, map);
 	}
 	else if (m_MapType == PlannerHNS::MAP_FOLDER)
 	{
@@ -142,6 +152,13 @@ void MapHandler::LoadKmlMap(const std::string& file_name, RoadNetwork& map)
 {
 	PlannerHNS::KmlMapLoader kml_loader;
 	kml_loader.LoadKML(file_name, map);
+}
+
+void MapHandler::LoadOpenDriveMap(const std::string& file_name, RoadNetwork& map)
+{
+	PlannerHNS::OpenDriveMapLoader xodr_loader;
+	xodr_loader.EnableLaneStitching();
+	xodr_loader.LoadXODR(file_name, map);
 }
 
 void MapHandler::callbackGetkmlMapFileName(const std_msgs::String& file_name)

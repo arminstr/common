@@ -14,7 +14,6 @@ using namespace std;
 
 namespace PlannerHNS
 {
-
 std::vector<std::pair<GPSPoint, GPSPoint> > PlanningHelpers::m_TestingClosestPoint;
 
 PlanningHelpers::PlanningHelpers()
@@ -2688,14 +2687,12 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 	WayPoint* 	pGoalCell 		= 0;
 	double 		nCounter 		= 0;
 
-
 	while(nextLeafToTrace.size()>0)
 	{
 		nCounter++;
 
 		unsigned int min_cost_index = 0;
 		double min_cost = DBL_MAX;
-
 		for(unsigned int i=0; i < nextLeafToTrace.size(); i++)
 		{
 			if(nextLeafToTrace.at(i).second->cost < min_cost)
@@ -2721,7 +2718,6 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 		}
 		else
 		{
-
 			if(pH->pLeft && !CheckLaneExits(all_cells_to_delete, pH->pLeft->pLane) && !CheckNodeExits(all_cells_to_delete, pH->pLeft) && bEnableLaneChange && before_change_distance > LANE_CHANGE_MIN_DISTANCE)
 			{
 				wp = new WayPoint();
