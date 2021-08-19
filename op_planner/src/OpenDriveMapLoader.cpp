@@ -72,6 +72,8 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	// std::cout << " >> Load Curbs from OpenDrive file .. " << std::endl;
 	std::vector<Curb> curbs = GetCurbsList(&odr);
 
+	std::vector<Boundary> boundaries = GetBoundariesList(&odr);
+
 	// std::cout << " >> Link lanes and waypoints with pointers ... " << std::endl;
 	//Link Lanes by pointers
 	MappingHelpers::LinkLanesPointers(map);
@@ -97,6 +99,12 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 
 	// map.curbs.clear();
 	map.curbs = curbs;
+
+	map.boundaries = boundaries;
+
+	std::cout << " >> Link Boundaries and Waypoints ... " << std::endl;
+	MappingHelpers::ConnectBoundariesToWayPoints(map);
+	MappingHelpers::LinkBoundariesToWayPoints(map);
 
 	MappingHelpers::LinkTrafficLightsIntoGroups(map);
 	MappingHelpers::ConnectTrafficLightsAndStopLines(map);
@@ -1280,6 +1288,117 @@ std::vector<opendrive::LaneWidth> OpenDriveMapLoader::GetLaneWidths(const opendr
 	}
 
 	return lW;
+}
+
+std::vector<Boundary> OpenDriveMapLoader::GetBoundariesList(const opendrive::OpenDriveData* odr)
+{
+	std::vector<Boundary> bList;
+
+	int boundaryIdCounter = 0;
+	// loop trough all junctions in odr map
+	for(const opendrive::Junction &junction : odr->junctions)
+	{
+		//TODO: create Boundaries around all junctions 
+		/*
+			Therefore loop through all roads inside the junction.
+			Then construct a polygon around the junction.
+		*/
+		Boundary b;
+		b.id = boundaryIdCounter;
+		boundaryIdCounter ++;
+		b.roadId = 0;
+		b.type = PlannerHNS::INTERSECTION_BOUNDARY;
+		std::vector<WayPoint> points;
+		for(const opendrive::JunctionConnection &connection: junction.connections)
+		{
+			for(const opendrive::RoadInformation &road : odr->roads)
+    		{
+				if(connection.attributes.connecting_road == road.attributes.id)
+				{
+					for(const opendrive::LaneSection &laneSection : road.lanes.lane_sections)
+					{
+						for(const opendrive::LaneInfo &laneInfoRight : laneSection.right)
+						{
+							points = GetCenterLaneData(odr, &road, &laneInfoRight);
+							for(const WayPoint &p : points) 
+							{
+								b.points.push_back(p);
+							}
+						}
+						for(const opendrive::LaneInfo &laneInfoLeft : laneSection.left)
+						{
+							points = GetCenterLaneData(odr, &road, &laneInfoLeft);
+							for(const WayPoint &p : points)
+							{
+								b.points.push_back(p);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Gift Wrapping Algorithm for Junction Convex Hull calculation
+		std::vector<WayPoint> hullPoints;
+		int firstPointOnHullIndex = FindLeftmostPointInJunctionPointsIndex(b.points);
+		int pointOnHullIndex = firstPointOnHullIndex;
+		WayPoint pointOnHull = b.points.at(pointOnHullIndex);
+		int endpointIndex = 0;
+		WayPoint endpoint;
+		int i = 0;
+		do
+		{
+			hullPoints.push_back(pointOnHull);
+			endpoint = b.points.at(0);
+			endpointIndex = 0;
+			for(int j = 0; j < b.points.size(); j ++)
+			{
+				if(endpointIndex == pointOnHullIndex || isPointLeftOfLine(hullPoints.at(i), endpoint, b.points.at(j)))
+				{
+					endpoint = b.points.at(j);
+					endpointIndex = j;
+				}
+			}
+			i ++;
+			pointOnHull = endpoint;
+			pointOnHullIndex = endpointIndex;
+		} while (endpointIndex != firstPointOnHullIndex);
+
+		b.points.clear();
+		// for clean visualization and closing boundaries, the first point is added as last point for a second time
+		hullPoints.push_back(hullPoints.at(0));
+		b.points = hullPoints;
+		bList.push_back(b);
+	}
+
+	return bList;
+}
+
+int OpenDriveMapLoader::FindLeftmostPointInJunctionPointsIndex(std::vector<PlannerHNS::WayPoint>& points)
+{
+	int leftmostPointIndex = 0;
+	double leftmostPosY = points[leftmostPointIndex].pos.y;
+	for (int i = 0; i < points.size(); i ++)
+	{
+		if(points[i].pos.y < points[leftmostPointIndex].pos.y)
+		{
+			leftmostPointIndex = i;
+			leftmostPosY = points[i].pos.y;
+		}
+	}
+	return leftmostPointIndex;
+}
+
+bool OpenDriveMapLoader::isPointLeftOfLine(PlannerHNS::WayPoint A, PlannerHNS::WayPoint B, PlannerHNS::WayPoint M)
+{
+	// line is defined by A and B
+	// M is the point to check
+	bool isLeft = false;
+
+	double determinantABAM = (B.pos.x - A.pos.x) * (M.pos.y - A.pos.y) - (B.pos.y - A.pos.y) * (M.pos.x - A.pos.x);
+	if(determinantABAM > 0)
+		isLeft = true;
+	return isLeft;
 }
 
 } /* namespace PlannerHNS */
