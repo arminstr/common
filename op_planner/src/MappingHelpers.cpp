@@ -629,6 +629,8 @@ void MappingHelpers::LinkLanesPointers(PlannerHNS::RoadNetwork& map)
 		for(unsigned int i =0; i < map.roadSegments.at(rs).Lanes.size(); i++)
 		{
 			Lane* pL = &map.roadSegments.at(rs).Lanes.at(i);
+			pL->pRoad = &map.roadSegments.at(rs);
+
 			for(unsigned int j = 0 ; j < pL->fromIds.size(); j++)
 			{
 				for(unsigned int l= 0; l < map.roadSegments.at(rs).Lanes.size(); l++)

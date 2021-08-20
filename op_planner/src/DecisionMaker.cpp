@@ -124,6 +124,7 @@ void DecisionMaker::InitBehaviorStates()
 	m_pInitState = new InitStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pGoToGoalState);
 
 	m_pFollowState = new FollowStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pGoToGoalState);
+	m_pYieldingState = new YieldingStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pGoToGoalState);
 	m_pAvoidObstacleState = new SwerveStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pGoToGoalState);
 	m_pStopSignWaitState = new StopSignWaitStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pGoToGoalState);
 	m_pStopSignStopState = new StopSignStopStateII(m_pStopState->m_pParams, m_pStopState->GetCalcParams(), m_pStopSignWaitState);
@@ -139,6 +140,7 @@ void DecisionMaker::InitBehaviorStates()
 	m_pGoToGoalState->InsertNextState(m_pStopSignStopState);
 	m_pGoToGoalState->InsertNextState(m_pTrafficLightStopState);
 	m_pGoToGoalState->InsertNextState(m_pFollowState);
+	m_pGoToGoalState->InsertNextState(m_pYieldingState);
 	m_pGoToGoalState->InsertNextState(m_pStopState);
 	m_pGoToGoalState->decisionMakingCount = 0;//m_params.nReliableCount;
 
@@ -147,18 +149,26 @@ void DecisionMaker::InitBehaviorStates()
 	m_pStopSignWaitState->decisionMakingTime = m_params.stopSignStopTime;
 	m_pStopSignWaitState->InsertNextState(m_pStopSignStopState);
 	m_pStopSignWaitState->InsertNextState(m_pGoalState);
+	m_pStopSignWaitState->InsertNextState(m_pYieldingState);
 
 
 	m_pTrafficLightStopState->InsertNextState(m_pTrafficLightWaitState);
 
 	m_pTrafficLightWaitState->InsertNextState(m_pTrafficLightStopState);
 	m_pTrafficLightWaitState->InsertNextState(m_pGoalState);
+	m_pTrafficLightWaitState->InsertNextState(m_pYieldingState);
 
 	m_pFollowState->InsertNextState(m_pAvoidObstacleState);
 	m_pFollowState->InsertNextState(m_pStopSignStopState);
 	m_pFollowState->InsertNextState(m_pTrafficLightStopState);
 	m_pFollowState->InsertNextState(m_pGoalState);
+	m_pFollowState->InsertNextState(m_pYieldingState);
 	m_pFollowState->decisionMakingCount = 0;//m_params.nReliableCount;
+
+	m_pYieldingState->InsertNextState(m_pGoToGoalState);
+	m_pYieldingState->InsertNextState(m_pFollowState);
+	m_pYieldingState->InsertNextState(m_pGoalState);
+	m_pYieldingState->decisionMakingCount = 0;
 
 	m_pInitState->decisionMakingCount = 0;//m_params.nReliableCount;
 
@@ -188,21 +198,30 @@ void DecisionMaker::InitBehaviorStates()
 
  void DecisionMaker::CalculateImportantParameterForDecisionMaking(const PlannerHNS::VehicleState& car_state,
 		 const bool& bEmergencyStop, const std::vector<TrafficLight>& detectedLights,
-		 const TrajectoryCost& bestTrajectory)
+		 const TrajectoryCost& bestTrajectory,
+		 const BehaviorState beh)
  {
 	 if(m_TotalPaths.size() == 0) return;
 
-	//Initialize internal decision making state variables
  	PreCalculatedConditions* pValues = m_pCurrentBehaviorState->GetCalcParams();
 
- 	if(m_CarInfo.max_deceleration != 0)
- 	{
- 		pValues->minStoppingDistance = -pow(car_state.speed, 2)/(2.0*m_CarInfo.max_deceleration) + m_params.additionalBrakingDistance;
- 	}
+	if(beh.boundaryType == INTERSECTION_BOUNDARY) {
+		pValues->bInsideIntersection = true;
+	} else 
+		pValues->bInsideIntersection = false; // always in an intersection (ToDo Armin Map loader)
+
+ 	if(m_CarInfo.max_deceleration != 0){ 
+		double systemDelay = 2; // brake control latency in seconds
+ 		pValues->minStoppingDistance = -pow(car_state.speed, 2)/(2.0*m_CarInfo.max_deceleration) 
+		 + m_params.additionalBrakingDistance 
+		 + car_state.speed*systemDelay;
+		 // adding system delay to account for additonal stopping distance, needed by the brake contoller, which can't 
+		 // decellerate with 1.5m/s^2 at once.
+	}
  	else
- 	{
  		pValues->minStoppingDistance = m_params.horizonDistance;
- 	}
+
+	// std::cout << "minStoppingDistance: " << pValues->minStoppingDistance << std::endl;
 
  	pValues->stoppingDistances.clear();
  	pValues->stoppingDistances.push_back(m_params.horizonDistance);
@@ -314,13 +333,25 @@ void DecisionMaker::InitBehaviorStates()
  	int stopLineID = -1;
  	int stopSignID = -1;
  	int trafficLightID = -1;
+	double plain_distanceToClosestStopLine = 0;
  	double distanceToClosestStopLine = 0;
  	bool bGreenTrafficLight = true;
  	double critical_long_front_distance =  m_params.additionalBrakingDistance + m_params.verticalSafetyDistance;
 
-  	distanceToClosestStopLine = PlanningHelpers::GetDistanceToClosestStopLineAndCheck(m_TotalPaths.at(pValues->iCurrSafeLane), state, m_params.giveUpDistance, stopLineID, stopSignID, trafficLightID) - critical_long_front_distance;
+	double trafficLightDetectionAdditonalRange = 20.0;
+	// make sure we detect the traffic light early 
 
- 	if(distanceToClosestStopLine > m_params.giveUpDistance && distanceToClosestStopLine < (pValues->minStoppingDistance + 1.0))
+plain_distanceToClosestStopLine = 
+	  PlanningHelpers::GetDistanceToClosestStopLineAndCheck(m_TotalPaths.at(pValues->iCurrSafeLane), 
+	  														state, 
+															m_params.giveUpDistance, 
+															stopLineID, 
+															stopSignID, 
+															trafficLightID);
+
+  	distanceToClosestStopLine = plain_distanceToClosestStopLine - critical_long_front_distance;	
+ 	if(		distanceToClosestStopLine > m_params.giveUpDistance 
+	 	&& 	distanceToClosestStopLine < (pValues->minStoppingDistance + trafficLightDetectionAdditonalRange ))
  	{
  		if(m_pCurrentBehaviorState->m_pParams->enableTrafficLightBehavior)
  		{
@@ -536,6 +567,16 @@ void DecisionMaker::InitBehaviorStates()
 
 	currentBehavior.minVelocity		= 0;
 	currentBehavior.stopDistance 	= preCalcPrams->distanceToStop();
+
+	// get distance to stopline
+	if (preCalcPrams->stoppingDistances.size() == 4) // position 4 is traffic light/sign stopline
+	{
+		currentBehavior.stopLineDistance = preCalcPrams->stoppingDistances.at(3);
+	}
+	else{
+		currentBehavior.stopLineDistance = -1;
+	}
+
 	currentBehavior.followVelocity 	= preCalcPrams->velocityOfNext;
 	if(preCalcPrams->iPrevSafeTrajectory<0 || preCalcPrams->iPrevSafeTrajectory >= m_LanesRollOuts.at(m_iCurrentTotalPathId).size())
 	{
@@ -581,7 +622,14 @@ void DecisionMaker::InitBehaviorStates()
 		beh_with_max.maxVelocity = m_params.maxSpeed;
 	}
 
-	double target_velocity = PlanningHelpers::GetACCVelocityModelBased(dt, CurrStatus.speed, m_CarInfo, m_ControlParams, beh_with_max);
+	//VehicleState desired_state =  m_VelocityController.DoOneStep(dt, beh_with_max, CurrStatus);
+
+	double target_velocity = PlanningHelpers::GetACCVelocityModelBased(dt, 
+															CurrStatus.speed, 
+															m_CarInfo, 
+															m_ControlParams, 
+															beh_with_max,
+															m_params);
 
 	for(unsigned int i =  0; i < m_Path.size(); i++)
 	{
@@ -656,6 +704,10 @@ void DecisionMaker::InitBehaviorStates()
 		//std::cout << "Desired Vel: " << desiredVelocity << std::endl;
 
 	}
+	else if (beh.state == YIELDING_STATE)
+	{
+		desiredVelocity = 0;
+	}
 	else if(beh.state == FORWARD_STATE || beh.state == OBSTACLE_AVOIDANCE_STATE )
 	{
 
@@ -712,17 +764,36 @@ void DecisionMaker::InitBehaviorStates()
 	 state = currPose;
 	 m_TotalPaths.clear();
 
+	if (currPose.boundaryId == 7)
+	{
+		beh.boundaryType = INTERSECTION_BOUNDARY;
+	}
+
+	if(m_prev_index.size() != m_TotalOriginalPaths.size())
+	{
+		m_prev_index.clear();
+		for(unsigned int i = 0; i < m_TotalOriginalPaths.size(); i++)
+		{
+			m_prev_index.push_back(0);
+		}
+
+	}
+
 	for(unsigned int i = 0; i < m_TotalOriginalPaths.size(); i++)
 	{
 		t_centerTrajectorySmoothed.clear();
 		m_prev_index.at(i) = PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_TotalOriginalPaths.at(i), state, m_params.horizonDistance ,	m_params.pathDensity , t_centerTrajectorySmoothed, m_prev_index.at(i));
+
 		if(m_prev_index.at(i) > 0 ) m_prev_index.at(i) = m_prev_index.at(i) -1;
+
 		m_TotalPaths.push_back(t_centerTrajectorySmoothed);
 	}
 
-	if(m_TotalPaths.size() == 0) return beh;
+	if(m_TotalPaths.size()==0) return beh;
 
-	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc);
+	//UpdateCurrentLane(m_params.maxLaneSearchDistance);
+
+	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh);
 
 	beh = GenerateBehaviorState(vehicleState);
 
@@ -743,5 +814,37 @@ void DecisionMaker::InitBehaviorStates()
 
 	return beh;
  }
+
+int DecisionMaker::getWayAreaID(RoadNetwork m_Map)
+{
+	// --- find boundary/area ---
+	int currentLaneID = this->m_LanesRollOuts.at(0).at(0).at(0).laneId;
+
+	for (int iter = 0; iter<m_Map.roadSegments.at(0).Lanes.size(); iter++)
+	// iterate torugh all lanes inside the map
+	{
+		if (m_Map.roadSegments.at(0).Lanes.at(iter).id == currentLaneID)
+		// find the lane, the vehicle is using
+		{
+			// getClosestWaypointID
+			double waypointPosX, waypointPosY, temp_distance;
+			int closestPointID = 0;
+			double rel_distance = 999999;
+			double vehiclePosX = this->m_LanesRollOuts.at(0).at(0).at(0).pos.x;
+			double vehiclePosY = this->m_LanesRollOuts.at(0).at(0).at(0).pos.y;
+			for (int wp_cnt = 0; wp_cnt < m_Map.roadSegments.at(0).Lanes.at(iter).points.size(); wp_cnt++){
+				waypointPosX = m_Map.roadSegments.at(0).Lanes.at(iter).points.at(wp_cnt).pos.x;
+				waypointPosY = m_Map.roadSegments.at(0).Lanes.at(iter).points.at(wp_cnt).pos.y;
+				temp_distance = abs(waypointPosX-vehiclePosX)+abs(waypointPosY-vehiclePosY);
+				if (temp_distance < rel_distance){
+					rel_distance = temp_distance;
+					closestPointID = wp_cnt;
+				}
+			}
+			return m_Map.roadSegments.at(0).Lanes.at(iter).points.at(closestPointID).boundaryId;
+		} 
+	}
+	return 0;
+}
 
 } /* namespace PlannerHNS */

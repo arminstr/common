@@ -168,7 +168,9 @@ void MotionControl::SteerControllerUpdate(const double& dt, const PlannerHNS::Wa
 		const PlannerHNS::VehicleState& CurrStatus, const PlannerHNS::BehaviorState& CurrBehavior,
 		const double& lateralErr, double& desiredSteerAngle)
 {
-	if(CurrBehavior.state != INITIAL_STATE && CurrBehavior.state != FINISH_STATE)
+	if(		CurrBehavior.state != INITIAL_STATE 	
+		|| 	(CurrBehavior.state == FINISH_STATE && CurrStatus.speed <= 0.3))
+		// avoid steering on standstill
 	{
 		AngleControllerPart(dt, CurrPose, TargetPose, lateralErr, desiredSteerAngle);
 
@@ -396,7 +398,17 @@ int MotionControl::StrokeControllerUpdateForOpenPlannerInternalACC(const double&
 	e_v = (desired_velocity - CurrStatus.speed); //Target max velocity error
 
 	desiredAccel = m_pidAccelPedal.getTimeDependentPID(e_v, dt);
-	if(e_v < 0 && desiredAccel < 0.5)
+
+	if (e_v < 0) desiredAccel = 0; 
+	// The integrator in the PID AccelPedal Controller decreases only slowly if a high Intergrator 
+	// value is used. This blocks the brake pedal controller output actuation, even if e_v is negative.
+	//
+	// By setting desired Accel to 0 the car won't actuate brake and accelerator at the same time but
+	// will prioritize braking over accelerating.
+
+	// MARKER MARKER MARKER MARKER
+
+	if(e_v < 0 && desiredAccel < 0.5) 
 	{
 		desiredBrake = m_pidBrakePedal.getTimeDependentPID(-e_v, dt);
 		m_pidAccelPedal.Reset();
@@ -503,7 +515,8 @@ int MotionControl::StrokeControllerUpdateTwoPID(const double& dt, const PlannerH
 void MotionControl::VelocityControllerUpdateUsingACC(const double& dt, const PlannerHNS::VehicleState& CurrStatus,
 		const PlannerHNS::BehaviorState& CurrBehavior, double& desiredVelocity, PlannerHNS::SHIFT_POS& desiredShift)
 {
-	desiredVelocity = PlanningHelpers::GetACCVelocityModelBased(dt, CurrStatus.speed, m_VehicleInfo, m_Params, CurrBehavior);
+	PlannerHNS::PlanningParams m_planningParams;
+	desiredVelocity = PlanningHelpers::GetACCVelocityModelBased(dt, CurrStatus.speed, m_VehicleInfo, m_Params, CurrBehavior, m_planningParams);
 	desiredShift = PlannerHNS::SHIFT_POS_DD;
 
 	//desiredVelocity = m_VehicleInfo.max_speed_forward;
@@ -605,7 +618,7 @@ PlannerHNS::ExtendedVehicleState MotionControl::DoOneStep(const double& dt, cons
 				}
 			}
 		}
-		else
+		else // Pedal stroke mode 
 		{
 			if(m_HyperParams.bUseInternalACC)
 			{
@@ -630,10 +643,12 @@ PlannerHNS::ExtendedVehicleState MotionControl::DoOneStep(const double& dt, cons
 
 		if(m_HyperParams.bEnableSteeringMode)
 		{
+			// steering angle output
 			SteerControllerUpdate(dt, m_ForwardSimulationPoint, m_FollowMePoint, vehicleState, behavior, m_LateralError, desiredState.steer);
 		}
 		else
 		{
+			// steering torque output
 			TorqueControllerUpdate(dt, m_ForwardSimulationPoint, m_FollowMePoint, vehicleState, behavior, m_LateralError, desiredState.steer_torque);
 		}
 

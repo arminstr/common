@@ -143,7 +143,7 @@ public:
 	 * @return
 	 */
 	static double GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
-			const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior);
+			const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params);
 
 	static void ShiftRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& curr_speed, const double& inc_ratio, const double& path_density);
 
@@ -180,7 +180,7 @@ public:
 	static void TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP, const std::vector<int>& globalPathIds,
 			std::vector<WayPoint>& localPath, std::vector<std::vector<WayPoint> >& localPaths);
 
-	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.15, double delay_factor = 1.0);
+	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.25, double delay_factor = 1.0);
 
 	static void PredictMotionTimeBased(double& x, double &y, double& heading, double steering, double velocity, double wheelbase, double time_elapsed);
 
@@ -244,6 +244,47 @@ public:
 	static double fprunge ( double x );
 
 	static double fpprunge ( double x );
+
+
+
+};
+
+class ACCHelper{
+
+
+	public:
+
+	const double& dt;
+	const double& CurrSpeed;
+	const PlannerHNS::CAR_BASIC_INFO& vehicleInfo;
+	const PlannerHNS::ControllerParams& ctrlParams;
+	const PlannerHNS::BehaviorState& CurrBehavior;
+	const PlannerHNS::PlanningParams& m_params;
+
+
+	ACCHelper(const double& dt, 
+		const double& CurrSpeed,
+		const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
+		const PlannerHNS::ControllerParams& ctrlParams,
+		const PlannerHNS::BehaviorState& CurrBehavior,
+		const PlannerHNS::PlanningParams& m_params): 
+			dt(dt),
+			CurrSpeed(CurrSpeed),
+			vehicleInfo(vehicleInfo),
+			ctrlParams(ctrlParams),
+			CurrBehavior(CurrBehavior),
+			m_params(m_params){}
+
+	double evaluateTargetAccleration(double distance_to_follow);
+	double limitMaxVelocity(double desiredVel);
+	double applyPushFactors(double target_a);
+	double evaluateDesiredVelocity(double target_a);
+	double slowDownInCurve(double target_a);
+	bool isObjectAhead();
+	double smoothStop(double target_a);
+	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
+
+
 
 };
 
