@@ -1298,11 +1298,11 @@ std::vector<Boundary> OpenDriveMapLoader::GetBoundariesList(const opendrive::Ope
 	// loop trough all junctions in odr map
 	for(const opendrive::Junction &junction : odr->junctions)
 	{
-		//TODO: create Boundaries around all junctions 
-		/*
+		/****
+			Create Boundaries around all junctions		
 			Therefore loop through all roads inside the junction.
 			Then construct a polygon around the junction.
-		*/
+		****/
 		Boundary b;
 		b.id = boundaryIdCounter;
 		boundaryIdCounter ++;
@@ -1389,13 +1389,13 @@ int OpenDriveMapLoader::FindLeftmostPointInJunctionPointsIndex(std::vector<Plann
 	return leftmostPointIndex;
 }
 
-bool OpenDriveMapLoader::isPointLeftOfLine(PlannerHNS::WayPoint A, PlannerHNS::WayPoint B, PlannerHNS::WayPoint M)
+bool OpenDriveMapLoader::isPointLeftOfLine(PlannerHNS::WayPoint A, PlannerHNS::WayPoint B, PlannerHNS::WayPoint C)
 {
 	// line is defined by A and B
-	// M is the point to check
+	// C is the point to check
 	bool isLeft = false;
 
-	double determinantABAM = (B.pos.x - A.pos.x) * (M.pos.y - A.pos.y) - (B.pos.y - A.pos.y) * (M.pos.x - A.pos.x);
+	double determinantABAM = (B.pos.x - A.pos.x) * (C.pos.y - A.pos.y) - (B.pos.y - A.pos.y) * (C.pos.x - A.pos.x);
 	if(determinantABAM > 0)
 		isLeft = true;
 	return isLeft;
