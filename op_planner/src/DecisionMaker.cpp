@@ -767,10 +767,7 @@ plain_distanceToClosestStopLine =
 	 state = currPose;
 	 m_TotalPaths.clear();
 
-	if (currPose.boundaryId == 7)
-	{
-		beh.boundaryType = INTERSECTION_BOUNDARY;
-	}
+	beh.boundaryType = currPose.pBoundary->type;
 
 	if(m_prev_index.size() != m_TotalOriginalPaths.size())
 	{
@@ -818,8 +815,10 @@ plain_distanceToClosestStopLine =
 	return beh;
  }
 
-int DecisionMaker::getWayAreaID(RoadNetwork m_Map)
+PlannerHNS::BOUNDARY_TYPE DecisionMaker::getWayAreaType(RoadNetwork m_Map)
 {
+	// ToDo: Replace by standard function to find closest waypoints.
+
 	// --- find boundary/area ---
 	int currentLaneID = this->m_LanesRollOuts.at(0).at(0).at(0).laneId;
 
@@ -844,10 +843,11 @@ int DecisionMaker::getWayAreaID(RoadNetwork m_Map)
 					closestPointID = wp_cnt;
 				}
 			}
-			return m_Map.roadSegments.at(0).Lanes.at(iter).points.at(closestPointID).boundaryId;
+			if (m_Map.roadSegments.at(0).Lanes.at(iter).points.at(closestPointID).pBoundary != nullptr)
+				return m_Map.roadSegments.at(0).Lanes.at(iter).points.at(closestPointID).pBoundary->type;
 		} 
 	}
-	return 0;
+	return BOUNDARY_TYPE::NORMAL_ROAD_BOUNDARY;
 }
 
 } /* namespace PlannerHNS */

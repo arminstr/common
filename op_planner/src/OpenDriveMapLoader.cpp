@@ -1304,7 +1304,7 @@ std::vector<Boundary> OpenDriveMapLoader::GetBoundariesList(const opendrive::Ope
 			Then construct a polygon around the junction.
 		*/
 		Boundary b;
-		b.id = boundaryIdCounter;
+		b.id = PlannerHNS::INTERSECTION_BOUNDARY;
 		boundaryIdCounter ++;
 		b.roadId = 0;
 		b.type = PlannerHNS::INTERSECTION_BOUNDARY;
