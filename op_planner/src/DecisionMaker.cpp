@@ -151,6 +151,9 @@ void DecisionMaker::InitBehaviorStates()
 	m_pStopSignWaitState->InsertNextState(m_pGoalState);
 	m_pStopSignWaitState->InsertNextState(m_pYieldingState);
 
+	m_pStopSignWaitState->decisionMakingTime = m_params.stopSignStopTime;
+	m_pStopSignWaitState->InsertNextState(m_pStopSignStopState);
+	m_pStopSignWaitState->InsertNextState(m_pGoalState);
 
 	m_pTrafficLightStopState->InsertNextState(m_pTrafficLightWaitState);
 
