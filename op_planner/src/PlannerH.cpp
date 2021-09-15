@@ -610,6 +610,7 @@ void PlannerH::GenerateKinematicallyFeasibleTrajectory(const VehicleState& curr_
 		std::reverse(path_out.begin(), path_out.end());
 		path_out.front().gid = path_out.back().gid;
 	}
+
 	PlanningHelpers::CalcAngleAndCost(path_out);
 }
 
