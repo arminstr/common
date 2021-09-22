@@ -1275,15 +1275,12 @@ double PlanningHelpers::GetDistanceToClosestStopLineAndCheck(const std::vector<W
 
 	RelativeInfo info;
 	GetRelativeInfo(path, p, info, prevIndex);
-
 	for(unsigned int i=info.iBack; i<path.size(); i++)
-	{
+	{		
 		if(path.at(i).stopLineID > 0 && path.at(i).pLane)
 		{
-
 			for(unsigned int j = 0; j < path.at(i).pLane->stopLines.size(); j++)
 			{
-
 				if(path.at(i).pLane->stopLines.at(j).id == path.at(i).stopLineID)
 				{
 					stopLineID = path.at(i).stopLineID;
@@ -2640,11 +2637,12 @@ double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDista
 	if (isStopLine) queue_length = 0.0; //standstill stop distance behind vehicle ahead;
 	else queue_length = 5.0;
 	
-	double gap_closing_acc = 0.5; // m/s²
+	double gap_closing_acc = 1.0; // m/s²
 	if (stopDistance > vehicleInfo.wheel_base+vehicleInfo.front_length+queue_length
 		&& CurrSpeed < 1.0)
 	{
 		currentDesiredVelocity = CurrSpeed+gap_closing_acc*dt;
+		currentDesiredVelocity = 1.0;
 	}
 	return currentDesiredVelocity;
 }
@@ -2694,7 +2692,7 @@ double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 	double additional_safety = 5.0;
 	double coastingOffset = CurrSpeed*2;
 	double targetDistance = distance_to_follow-(vehicleInfo.front_length+vehicleInfo.wheel_base+additional_safety);
-	double safeDistance = (CurrSpeed*3.6); 	// this usually should be (CurrSpeed*3.6)/2 but we are using without /2 due 
+	double safeDistance = (CurrSpeed*3.6)/2; 	// this usually should be (CurrSpeed*3.6)/2 but we are using without /2 due 
 											// to offsets compared to real vehicle beahvior 
 	double CoastDistance = safeDistance; 
 	double emergencyBrakeDistance = (CurrSpeed*3.6/10)*(CurrSpeed*3.6/10);
@@ -2735,11 +2733,11 @@ double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 				std::cout << " --> FOLLOW DCC " << targetAcceleration << std::endl;
 			}
 		}
-		else if(targetDistance < emergencyBrakeDistance)
+		else if(targetDistance < emergencyBrakeDistance && CurrSpeed > 2)
 		// Emergency Stop
 		{
 			targetAcceleration = -9.8*4; //stop with -4G
-			std::cout << " --> EMERGENCY STOP" << std::endl;
+			std::cout << " -------------> EMERGENCY STOP" << std::endl;
 		}
 		else
 		{

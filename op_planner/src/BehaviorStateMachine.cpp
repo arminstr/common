@@ -493,10 +493,13 @@ BehaviorStateMachine* StopSignStopStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
+	std::cout << pCParams->getDistanceToStopLine() << std::endl;
+
 	if(pCParams->currentGoalID != pCParams->prevGoalID)
 		return FindBehaviorState(GOAL_STATE);
 
-	else if(pCParams->currentVelocity < m_zero_velocity)
+	else if(pCParams->currentVelocity < m_zero_velocity
+			&& pCParams->getDistanceToStopLine() <= 3)
 		return FindBehaviorState(STOP_SIGN_WAIT_STATE);
 
 	else
@@ -531,7 +534,7 @@ BehaviorStateMachine* TrafficLightStopStateII::GetNextState()
 
 	else if(pCParams->bTrafficIsRed 
 		&& pCParams->currentVelocity <= m_zero_velocity
-		&& pCParams->getDistanceToStopLine() <= 2)
+		&& pCParams->getDistanceToStopLine() <= 3)
 	{
 		std::cout << "Velocity Changed Stopping for trafficLight ("  <<pCParams->currentVelocity << ", " << m_zero_velocity << ")" <<  std::endl;
 		return FindBehaviorState(TRAFFIC_LIGHT_WAIT_STATE);

@@ -41,6 +41,7 @@ public:
 	std::vector<Boundary> GetBoundariesList(const opendrive::OpenDriveData* odr);
 	std::vector<StopLine> GetStopLinesList(const opendrive::OpenDriveData* odr);
 	std::vector<TrafficLight> GetTrafficLightsList(const opendrive::OpenDriveData* odr);
+	std::vector<TrafficSign> GetTrafficSignsList(const opendrive::OpenDriveData* odr);
 	std::vector<RoadSegment> GetRoadSegmentsList(const opendrive::OpenDriveData* odr);
 	Lane GetLaneInfo(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo);
 	std::vector<int> GetFromIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo);

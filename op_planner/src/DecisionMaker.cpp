@@ -353,14 +353,21 @@ plain_distanceToClosestStopLine =
 															trafficLightID);
 
   	distanceToClosestStopLine = plain_distanceToClosestStopLine - critical_long_front_distance;	
+
+	// std::cout << "distanceToClosestStopLine: " << distanceToClosestStopLine << " SignID: "<< stopSignID << std::endl;
+	// std::cout << " lightID: "<< trafficLightID << std::endl;
+	
+	stopSignID = 1;
+
  	if(		distanceToClosestStopLine > m_params.giveUpDistance 
 	 	&& 	distanceToClosestStopLine < (pValues->minStoppingDistance + trafficLightDetectionAdditonalRange ))
  	{
+
  		if(m_pCurrentBehaviorState->m_pParams->enableTrafficLightBehavior)
  		{
  			pValues->currentTrafficLightID = trafficLightID;
  			//Debug
- 			//std::cout << "Detected Traffic Light: " << trafficLightID << std::endl;
+ 			// std::cout << "Detected Traffic Light: " << trafficLightID << std::endl;
  			for(unsigned int i=0; i< detectedLights.size(); i++)
  			{
  				if(detectedLights.at(i).id == trafficLightID)
@@ -373,12 +380,12 @@ plain_distanceToClosestStopLine =
  			pValues->currentStopSignID = stopSignID;
  			pValues->stoppingDistances.push_back(distanceToClosestStopLine);
  			//Debug
- 			//std::cout << "LP => D: " << pValues->distanceToStop() << ", PrevSignID: " << pValues->prevTrafficLightID << ", CurrSignID: " << pValues->currentTrafficLightID << ", Green: " << bGreenTrafficLight << std::endl;
+ 			// std::cout << "LP => D: " << pValues->distanceToStop() << ", PrevSignID: " << pValues->prevTrafficLightID << ", CurrSignID: " << pValues->currentTrafficLightID << ", Green: " << bGreenTrafficLight << std::endl;
  		}
  	}
 
  	//Debug
- 	//std::cout << "Distance To Closest: " << distanceToClosestStopLine << ", Stop LineID: " << stopLineID << ", Stop SignID: " << stopSignID << ", TFID: " << trafficLightID << std::endl;
+ 	// std::cout << "Distance To Closest: " << distanceToClosestStopLine << ", Stop LineID: " << stopLineID << ", Stop SignID: " << stopSignID << ", TFID: " << trafficLightID << std::endl;
 
  	pValues->bTrafficIsRed = !bGreenTrafficLight;
 

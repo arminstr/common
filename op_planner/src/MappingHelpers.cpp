@@ -1810,7 +1810,7 @@ bool MappingHelpers::IsPointExist(const WayPoint& p, const std::vector<PlannerHN
 	 for(auto& tl: map.trafficLights)
 	 {
 		 for(auto& sl: map.stopLines)
-		 {
+		 { 
 			 if(sl.id == tl.stopLineID)
 			 {
 				 InsertUniqueId(sl.lightIds, tl.id);

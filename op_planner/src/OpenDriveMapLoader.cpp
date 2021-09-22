@@ -69,6 +69,9 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	// std::cout << " >> Load Traffic Lights from OpenDrive file ... " << std::endl;
 	std::vector<TrafficLight> trafficLights = GetTrafficLightsList(&odr);
 
+	// std::cout << " >> Load Traffic Lights from OpenDrive file ... " << std::endl;
+	std::vector<TrafficSign> trafficSigns = GetTrafficSignsList(&odr);
+
 	// std::cout << " >> Load Curbs from OpenDrive file .. " << std::endl;
 	std::vector<Curb> curbs = GetCurbsList(&odr);
 
@@ -1110,6 +1113,225 @@ std::vector<TrafficLight> OpenDriveMapLoader::GetTrafficLightsList(const opendri
 		}
 	}
 	return tlList;
+}
+
+// Create Traffic Light for each signal with type == 1000001
+std::vector<TrafficSign> OpenDriveMapLoader::GetTrafficSignsList(const opendrive::OpenDriveData* odr)
+{
+	std::vector<TrafficSign> tsList;
+	std::vector<TrafficLight> tlList;
+
+	std::cout << "STARTING TL List" << std::endl;
+
+	// iterate trough roads to identify signals
+	for(const opendrive::RoadInformation &road : odr->roads)
+    {
+		if(road.traffic_signals.size() > 0)
+		{
+			// check if there is a traffic signal with traffic light 
+			for(int i = 0; i < road.traffic_signals.size(); i++)
+			{
+				if(road.traffic_signals.at(i).type == "1000001")
+				{
+					
+					TrafficLight tl;
+					//get base point of Stop Line
+					double s_pos = road.traffic_signals.at(i).start_position;
+					double t_pos = road.traffic_signals.at(i).track_position;
+
+					tl.id = 10 + road.traffic_signals.at(i).id*10;
+
+					// iterate trough roads to identify signal references
+					for(const opendrive::RoadInformation &road : odr->roads)
+					{
+						if(road.traffic_signal_references.size() > 0)
+						{
+							for(int i = 0; i < road.traffic_signal_references.size(); i++)
+							{	
+								if(tl.id == (10 + road.traffic_signal_references.at(i).id * 10))
+								{
+									// get the current road's lane id
+									int laneId = 0;
+									const std::vector<opendrive::LaneWidth>* width;
+									for(const opendrive::LaneSection &laneSection : road.lanes.lane_sections)
+									{
+										for(const opendrive::LaneInfo &laneInfoRight : laneSection.right)
+										{
+											if(	laneInfoRight.attributes.type == opendrive::LaneType::Driving
+												|| laneInfoRight.attributes.type == opendrive::LaneType::Shoulder)
+											{
+												laneId = laneInfoRight.attributes.id;
+												width = &laneInfoRight.lane_width;
+												break;
+											}
+										}
+										for(const opendrive::LaneInfo &laneInfoLeft : laneSection.left)
+										{
+											if(	laneInfoLeft.attributes.type == opendrive::LaneType::Driving
+												|| laneInfoLeft.attributes.type == opendrive::LaneType::Shoulder)
+											{
+												laneId = laneInfoLeft.attributes.id;
+												width = &laneInfoLeft.lane_width;
+												break;
+											}
+										}
+									}
+
+									if(laneId != 0)
+									{										
+										tl.laneIds.push_back(10 + road.attributes.id * 10 + laneId);
+										tl.stopLineID = tl.id;
+
+										if(tl.laneIds.size() > 0 && tl.stopLineID != 0)
+										{
+											ROS_INFO("Found %d Lanes and Stop Line %d for traffic Light: %d", tl.laneIds.size(), tl.stopLineID, tl.id);
+										}else{
+											ROS_FATAL("No Lanes and Stop Line found for Traffic Light: %d", tl.id);
+										}
+
+									}
+								}
+							}
+						}
+					}
+
+					tl.lightType = RED_LIGHT;
+					
+					tl.vertical_angle = 2 * M_PI;
+					tl.horizontal_angle = 2 * M_PI;
+
+					// get the current road's lane id
+					int laneId = 0;
+					const std::vector<opendrive::LaneWidth>* width;
+					for(const opendrive::LaneSection &laneSection : road.lanes.lane_sections)
+					{
+						for(const opendrive::LaneInfo &laneInfoRight : laneSection.right)
+						{
+							if(	laneInfoRight.attributes.type == opendrive::LaneType::Driving
+								|| laneInfoRight.attributes.type == opendrive::LaneType::Shoulder)
+							{
+								laneId = laneInfoRight.attributes.id;
+								width = &laneInfoRight.lane_width;
+								break;
+							}
+						}
+						for(const opendrive::LaneInfo &laneInfoLeft : laneSection.left)
+						{
+							if(	laneInfoLeft.attributes.type == opendrive::LaneType::Driving
+								|| laneInfoLeft.attributes.type == opendrive::LaneType::Shoulder)
+							{
+								laneId = laneInfoLeft.attributes.id;
+								width = &laneInfoLeft.lane_width;
+								break;
+							}
+						}
+					}
+					ROS_INFO("Lane ID: %d", laneId);
+					if(laneId != 0)
+					{
+						ROS_INFO("Creating traffic light: %d", tl.id);
+						
+						int sideId = 0;
+						if(laneId > 0)
+						{
+							sideId = 1;
+						}
+						if(laneId < 0)
+						{
+							sideId = -1;
+						}
+
+						// flip the s_pos starting point since the geometry was defined in the other direction
+						// if(sideId > 0)
+						// 	s_pos = road.attributes.length - s_pos;
+
+						PlannerHNS::WayPoint pRef;
+						// iterate trough all geometries defining the road to get the geometry at s_pos
+						unsigned int geoIndex = 0;
+						for(unsigned int i = 0; i < road.geometry_attributes.size(); i ++)
+						{
+							if(i < road.geometry_attributes.size()-1)
+							{
+								if(road.geometry_attributes.at(i)->start_position < s_pos && road.geometry_attributes.at(i + 1)->start_position > s_pos)
+									geoIndex = i;
+								
+							}
+							if(i == road.geometry_attributes.size()-1)
+							{
+								if(road.geometry_attributes.at(i)->start_position < s_pos)
+									geoIndex = i;
+							}
+						}
+
+						const std::unique_ptr<opendrive::GeometryAttributes> &geometry = road.geometry_attributes.at(geoIndex);
+
+						// get the gps position of the traffic Light reference
+						try
+						{
+							switch (geometry->type)
+							{
+								case opendrive::GeometryType::ARC:
+								{
+									auto arc = static_cast<opendrive::GeometryAttributesArc *>(geometry.get());
+									double sArc = s_pos - arc->start_position;
+									if(sArc > arc->length)
+										sArc = arc->length;
+									pRef = GeneratePointFromArc( arc, *width, laneId, 0, sideId, arc->start_position, sArc);
+									break;
+								}
+								break;
+								case opendrive::GeometryType::LINE:
+								{
+									auto line = static_cast<opendrive::GeometryAttributesLine *>(geometry.get());
+									double sLine = s_pos - line->start_position;
+									if(sLine > line->length)
+										sLine = line->length;
+									pRef = GeneratePointFromLine( line, *width, laneId, 0, sideId, line->start_position, sLine );
+									break;
+								}
+								break;
+								case opendrive::GeometryType::SPIRAL:
+								{
+									ROS_FATAL(">> SPIRAL Geometries are not covered by GetCenterLaneData!");
+									break;
+								}
+								break;
+								case opendrive::GeometryType::POLY3:
+								{
+									ROS_FATAL(">> POLY3 Geometries are not covered by GetCenterLaneData!");
+									break;
+								}
+								break;
+								case opendrive::GeometryType::PARAMPOLY3:
+								{
+									ROS_FATAL(">> PARAMPOLY3 Geometries are not covered by GetCenterLaneData!");
+									break;
+								}
+								break;
+								default:
+								break;
+							}
+						}
+						catch (...)
+						{
+							ROS_FATAL(">> In GetTrafficLightsList: Geometries are not covered by GetCenterLaneData!");
+							continue;
+						}
+
+						PlannerHNS::WayPoint p;
+						p.pos.x = pRef.pos.x + cos(pRef.pos.a - M_PI_2) * (t_pos); //* sideId);
+						p.pos.y = pRef.pos.y + sin(pRef.pos.a - M_PI_2) * (t_pos); //* sideId);
+						p.pos.z = road.traffic_signals.at(i).zoffset;
+
+						tl.pose = p;
+
+						tlList.push_back(tl);
+					}
+				}
+			}
+		}
+	}
+	return tsList;
 }
 
 std::vector<Curb> OpenDriveMapLoader::GetCurbsList(const opendrive::OpenDriveData* odr){
