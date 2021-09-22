@@ -15,7 +15,7 @@ namespace PlannerHNS
 {
 
 DecisionMaker::DecisionMaker()
-{
+{	
 	m_iSinceLastReplan = 0;
 	m_CurrGlobalId = -1;
 	m_iCurrentTotalPathId = 0;
@@ -189,7 +189,7 @@ void DecisionMaker::InitBehaviorStates()
 
 			 if(a_diff < M_PI_2 && trafficLights.at(i).id != prevTrafficLightId)
 			 {
-				 //std::cout << "Detected Light, ID = " << trafficLights.at(i).id << ", Distance = " << d << ", Angle = " << trafficLights.at(i).pos.a*RAD2DEG << ", Car Heading = " << state.pos.a*RAD2DEG << ", Diff = " << a_diff*RAD2DEG << std::endl;
+				//std::cout << "Detected Light, ID = " << trafficLights.at(i).id << ", Distance = " << d << ", Angle = " << trafficLights.at(i).pos.a*RAD2DEG << ", Car Heading = " << state.pos.a*RAD2DEG << ", Diff = " << a_diff*RAD2DEG << std::endl;
 				 trafficL = trafficLights.at(i);
 				 return true;
 			 }
@@ -215,9 +215,15 @@ void DecisionMaker::InitBehaviorStates()
 
  	if(m_CarInfo.max_deceleration != 0){ 
 		double systemDelay = 2; // brake control latency in seconds
- 		pValues->minStoppingDistance = -pow(car_state.speed, 2)/(2.0*m_CarInfo.max_deceleration) 
-		 + m_params.additionalBrakingDistance 
-		 + car_state.speed*systemDelay;
+ 		bool testing_robert = true;
+		 if (testing_robert == true) {
+		 pValues->minStoppingDistance = 5.0; }
+		 else {
+			pValues->minStoppingDistance = -pow(car_state.speed, 2)/(2.0*m_CarInfo.max_deceleration) 
+		 	+ m_params.additionalBrakingDistance 
+		 	+ car_state.speed*systemDelay;
+		 } 
+
 		 // adding system delay to account for additonal stopping distance, needed by the brake contoller, which can't 
 		 // decellerate with 1.5m/s^2 at once.
 	}
@@ -298,8 +304,8 @@ void DecisionMaker::InitBehaviorStates()
  	{
  		pValues->iCurrSafeTrajectory = pValues->iCentralTrajectory;
  	}
-
- 	pValues->bFullyBlock = bestTrajectory.bBlocked;
+	 
+	pValues->bFullyBlock = bestTrajectory.bBlocked;
 
 	/**
 	 * Block End ---------------------------------------------------------------------
@@ -309,17 +315,17 @@ void DecisionMaker::InitBehaviorStates()
 	 * Set reach goal state values
 	 */
  	pValues->distanceToGoal = PlannerHNS::PlanningHelpers::GetDistanceFromPoseToEnd(state, m_TotalPaths.at(pValues->iCurrSafeLane));
- 	if((pValues->distanceToGoal < -m_params.goalDiscoveryDistance) || (pValues->distanceToGoal > m_params.horizonDistance))
+	if((pValues->distanceToGoal < -m_params.goalDiscoveryDistance) || (pValues->distanceToGoal > m_params.horizonDistance))
  	{
  		pValues->distanceToGoal = m_params.horizonDistance;
  	}
 
  	pValues->stoppingDistances.push_back(pValues->distanceToGoal);
 
- 	if(pValues->distanceToGoal < m_params.goalDiscoveryDistance)
+	if(pValues->distanceToGoal < m_params.goalDiscoveryDistance)
  	{
  		pValues->currentGoalID = -1;
- 	}
+	}
 	else
 	{
 		pValues->currentGoalID = 1;
@@ -336,7 +342,7 @@ void DecisionMaker::InitBehaviorStates()
  	int stopLineID = -1;
  	int stopSignID = -1;
  	int trafficLightID = -1;
-	double plain_distanceToClosestStopLine = 0;
+ 	double plain_distanceToClosestStopLine = 0;
  	double distanceToClosestStopLine = 0;
  	bool bGreenTrafficLight = true;
  	double critical_long_front_distance =  m_params.additionalBrakingDistance + m_params.verticalSafetyDistance;
@@ -344,7 +350,7 @@ void DecisionMaker::InitBehaviorStates()
 	double trafficLightDetectionAdditonalRange = 20.0;
 	// make sure we detect the traffic light early 
 
-plain_distanceToClosestStopLine = 
+  	plain_distanceToClosestStopLine = 
 	  PlanningHelpers::GetDistanceToClosestStopLineAndCheck(m_TotalPaths.at(pValues->iCurrSafeLane), 
 	  														state, 
 															m_params.giveUpDistance, 
@@ -352,14 +358,14 @@ plain_distanceToClosestStopLine =
 															stopSignID, 
 															trafficLightID);
 
-  	distanceToClosestStopLine = plain_distanceToClosestStopLine - critical_long_front_distance;	
+	distanceToClosestStopLine = plain_distanceToClosestStopLine - critical_long_front_distance;	
 
 	// std::cout << "distanceToClosestStopLine: " << distanceToClosestStopLine << " SignID: "<< stopSignID << std::endl;
 	// std::cout << " lightID: "<< trafficLightID << std::endl;
 	
 	stopSignID = 1;
 
- 	if(		distanceToClosestStopLine > m_params.giveUpDistance 
+ 	 	if(		distanceToClosestStopLine > m_params.giveUpDistance 
 	 	&& 	distanceToClosestStopLine < (pValues->minStoppingDistance + trafficLightDetectionAdditonalRange ))
  	{
 
@@ -368,7 +374,7 @@ plain_distanceToClosestStopLine =
  			pValues->currentTrafficLightID = trafficLightID;
  			//Debug
  			// std::cout << "Detected Traffic Light: " << trafficLightID << std::endl;
- 			for(unsigned int i=0; i< detectedLights.size(); i++)
+			for(unsigned int i=0; i< detectedLights.size(); i++)
  			{
  				if(detectedLights.at(i).id == trafficLightID)
  					bGreenTrafficLight = (detectedLights.at(i).lightType == GREEN_LIGHT);
@@ -505,7 +511,7 @@ plain_distanceToClosestStopLine =
 	 }
  }
 
- void DecisionMaker::CheckForCurveZone(const VehicleState& vehicleState, double& curr_curve_cost, double& min_curve_cost)
+void DecisionMaker::CheckForCurveZone(const VehicleState& vehicleState, double& curr_curve_cost, double& min_curve_cost)
  {
 	double look_ahead_distance = PlannerHNS::PlanningHelpers::CalculateLookAheadDistance(m_ControlParams.SteeringDelay, vehicleState.speed, m_ControlParams.minPursuiteDistance) + m_CarInfo.length;
 	RelativeInfo total_info;
@@ -533,10 +539,10 @@ plain_distanceToClosestStopLine =
 	return false;
  }
 
- bool DecisionMaker::SelectSafeTrajectory(const PlannerHNS::VehicleState& vehicleState)
+  bool DecisionMaker::SelectSafeTrajectory(const PlannerHNS::VehicleState& vehicleState)
  {
 	 m_iSinceLastReplan++;
-	 bool bNewTrajectory = false;
+	 	 bool bNewTrajectory = false;
 	 PlannerHNS::PreCalculatedConditions *preCalcPrams = m_pCurrentBehaviorState->GetCalcParams();
 
 	 if(!preCalcPrams || m_LanesRollOuts.at(m_iCurrentTotalPathId).size() == 0) return bNewTrajectory;
@@ -625,15 +631,19 @@ plain_distanceToClosestStopLine =
 	 BehaviorState beh_with_max = beh;
 
 	RelativeInfo total_info;
-	PlanningHelpers::GetRelativeInfo(m_TotalPaths.at(m_iCurrentTotalPathId), state, total_info);
+	PlanningHelpers::GetRelativeInfo(m_TotalPaths.at(m_iCurrentTotalPathId), state, total_info);		
 	beh_with_max.maxVelocity = PlannerHNS::PlanningHelpers::GetVelocityAhead(m_TotalPaths.at(m_iCurrentTotalPathId), total_info, total_info.iBack, preCalcPrams->minStoppingDistance*m_params.curveSlowDownRatio);
+	// Debug: Look Ahead Distance for vel speed set to zero; Robert)
+	beh_with_max.maxVelocity = PlannerHNS::PlanningHelpers::GetVelocityAhead(m_TotalPaths.at(m_iCurrentTotalPathId), total_info, total_info.iBack, 0);
+	//std::cout << "############### target velocity      :     " << beh_with_max.maxVelocity <<" # current speed: " << CurrStatus.speed << std::endl;
+	
 	if(beh_with_max.maxVelocity > m_params.maxSpeed)
 	{
 		beh_with_max.maxVelocity = m_params.maxSpeed;
 	}
-
+	
 	//VehicleState desired_state =  m_VelocityController.DoOneStep(dt, beh_with_max, CurrStatus);
-
+	
 	double target_velocity = PlanningHelpers::GetACCVelocityModelBased(dt, 
 															CurrStatus.speed, 
 															m_CarInfo, 
@@ -644,8 +654,9 @@ plain_distanceToClosestStopLine =
 	for(unsigned int i =  0; i < m_Path.size(); i++)
 	{
 		m_Path.at(i).v = target_velocity;
+		// ?????????????????? The reason for this function ist not reasonable, because the speed profile is already determined for the track.  
 	}
-
+	
 	return target_velocity;
  }
  
@@ -790,7 +801,7 @@ plain_distanceToClosestStopLine =
 	{
 		t_centerTrajectorySmoothed.clear();
 		m_prev_index.at(i) = PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_TotalOriginalPaths.at(i), state, m_params.horizonDistance ,	m_params.pathDensity , t_centerTrajectorySmoothed, m_prev_index.at(i));
-
+				
 		if(m_prev_index.at(i) > 0 ) m_prev_index.at(i) = m_prev_index.at(i) -1;
 
 		m_TotalPaths.push_back(t_centerTrajectorySmoothed);
@@ -799,7 +810,7 @@ plain_distanceToClosestStopLine =
 	if(m_TotalPaths.size()==0) return beh;
 
 	//UpdateCurrentLane(m_params.maxLaneSearchDistance);
-
+	
 	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh);
 
 	beh = GenerateBehaviorState(vehicleState);
