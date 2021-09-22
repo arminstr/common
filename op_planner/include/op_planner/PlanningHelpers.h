@@ -13,6 +13,8 @@
 #include "tinyxml.h"
 #include "PlannerCommonDef.h"
 
+#define DISABLE_CARLA_SPECIAL_CODE
+
 namespace PlannerHNS {
 
 #define distance2points(from , to) sqrt(pow(to.x - from.x, 2) + pow(to.y - from.y, 2))
@@ -42,15 +44,15 @@ public:
 	 * @param end_range_distance
 	 * @return -1 if distance from currPose to the end of all paths is less than end_range_distance.
 	 */
+
+
 	static int CheckForEndOfPaths(const std::vector<std::vector<PlannerHNS::WayPoint> >& paths, const PlannerHNS::WayPoint& currPose, const double& end_range_distance);
 
 	static bool GetRelativeInfo(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex = 0);
 
-	static bool GetRelativeInfoDirectionLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex = 0);
-
 	static bool GetRelativeInfoLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex = 0);
 
-	static bool GetRelativeInfoDirection(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex =0);
+	static bool GetRelativeInfoSlow(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex =0);
 
 	static bool GetRelativeInfoRange(const std::vector<std::vector<WayPoint> >& trajectories, const WayPoint& p, const double& searchDistance, RelativeInfo& info);
 
@@ -64,7 +66,9 @@ public:
 
 	static int GetClosestNextPointIndexFastV2(const std::vector<WayPoint>& trajectory, const WayPoint& p, const int& prevIndex = 0);
 
-	static int GetClosestNextPointIndexDirectionFast(const std::vector<WayPoint>& trajectory, const WayPoint& p, const int& prevIndex = 0, const bool& debug = false);
+	static int GetClosestNextPointIndexDirectionFast(const std::vector<WayPoint>& trajectory, const WayPoint& p, const int& prevIndex = 0);
+
+	static int GetClosestNextPointIndexDirectionFastV2(const std::vector<WayPoint>& trajectory, const WayPoint& p, const int& prevIndex = 0);
 
 	static int GetClosestPointIndex(const std::vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex = 0 );
 
@@ -98,7 +102,7 @@ public:
 
 	//static double CalcAngleAndCostSimple(std::vector<WayPoint>& path, const double& lastCost = 0);
 
-	static void CalcAngleAndCurvatureCost(std::vector<WayPoint>& path);
+	static double CalcAngleAndCostAndCurvatureAnd2D(std::vector<WayPoint>& path, const double& lastCost = 0);
 
 	static void CalcDtLaneInfo(std::vector<WayPoint>& path);
 
@@ -131,7 +135,7 @@ public:
 
 	static void SmoothGlobalPathSpeed(std::vector<WayPoint>& path);
 
-	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor);
+	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max = 2.0, double a_x_max = 1.5,double jerk = 1.0);
 
 	/**
 	 *
@@ -207,8 +211,6 @@ public:
 
 	static double GetVelocityAhead(const std::vector<WayPoint>& path, const RelativeInfo& info,int& prev_index, const double& reasonable_brake_distance);
 
-	static double GetCurvatureCostAhead(const std::vector<WayPoint>& path, const RelativeInfo& info,int& prev_index, const double& search_distance);
-
 	static bool CompareTrajectories(const std::vector<WayPoint>& path1, const std::vector<WayPoint>& path2);
 
 	static double GetDistanceToClosestStopLineAndCheck(const std::vector<WayPoint>& path, const WayPoint& p, const double& giveUpDistance, int& stopLineID,int& stopSignID, int& trafficLightID, const int& prevIndex = 0);
@@ -282,7 +284,7 @@ class ACCHelper{
 	double slowDownInCurve(double target_a);
 	bool isObjectAhead();
 	double smoothStop(double target_a);
-	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
+	double closeGapToStop(double currentDesiredVelocity, double stopDistance);
 
 
 

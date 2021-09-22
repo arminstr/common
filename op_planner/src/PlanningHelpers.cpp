@@ -14,6 +14,7 @@ using namespace std;
 
 namespace PlannerHNS
 {
+// todo remove this comment
 std::vector<std::pair<GPSPoint, GPSPoint> > PlanningHelpers::m_TestingClosestPoint;
 
 PlanningHelpers::PlanningHelpers()
@@ -32,7 +33,7 @@ int PlanningHelpers::CheckForEndOfPaths(const std::vector<std::vector<PlannerHNS
 	bool ret = PlannerHNS::PlanningHelpers::GetRelativeInfoRange(paths, currPose, 0.75, info);
 	if(ret == true && info.iGlobalPath >= 0 &&  info.iGlobalPath < paths.size() && info.iFront > 0 && info.iFront < paths.at(info.iGlobalPath).size())
 	{
-		double remaining_distance = paths.at(info.iGlobalPath).at(paths.at(info.iGlobalPath).size()-1).distanceCost - (paths.at(info.iGlobalPath).at(info.iFront).distanceCost + info.to_front_distance);
+		double remaining_distance = paths.at(info.iGlobalPath).at(paths.at(info.iGlobalPath).size()-1).cost - (paths.at(info.iGlobalPath).at(info.iFront).cost + info.to_front_distance);
 
 		PlannerHNS::RelativeInfo info_curr;
 		PlannerHNS::PlanningHelpers::GetRelativeInfoLimited(paths.at(info.iGlobalPath), currPose, info_curr, info.iBack);
@@ -50,6 +51,7 @@ int PlanningHelpers::CheckForEndOfPaths(const std::vector<std::vector<PlannerHNS
 
 bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoint> >& trajectories, const WayPoint& p,const double& searchDistance, RelativeInfo& info)
 {
+	// std::cout << "**** called bool PlanningHelpers::GetRelativeInfoRange ****" << std::endl;
 	if(trajectories.size() == 0) return false;
 
 	vector<RelativeInfo> infos;
@@ -64,7 +66,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 			infos.push_back(info_item);
 		}
 	}
-
+	
 	if(infos.size() == 0)
 		return false;
 	else if(infos.size() == 1)
@@ -81,6 +83,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 		if(searchDistance > 0)
 		{
 			double laneChangeCost = trajectories.at(infos.at(i).iGlobalPath).at(infos.at(i).iFront).laneChangeCost;
+			std::cout << "**** laneChangeCost: " << laneChangeCost << " ****" << std::endl;
 			if(fabs(infos.at(i).perp_distance) < searchDistance && laneChangeCost < minCost)
 			{
 				min_index = i;
@@ -102,82 +105,12 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 	return true;
 }
 
-bool PlanningHelpers::GetRelativeInfoDirection(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex)
-{
-	if(trajectory.size() < 2) return false;
-
-	WayPoint p0, p1;
-	if(trajectory.size()==2)
-	{
-		p0 = trajectory.at(0);
-		p1 = WayPoint((trajectory.at(0).pos.x+trajectory.at(1).pos.x)/2.0,
-					  (trajectory.at(0).pos.y+trajectory.at(1).pos.y)/2.0,
-					  (trajectory.at(0).pos.z+trajectory.at(1).pos.z)/2.0, trajectory.at(0).pos.a);
-		info.iFront = 1;
-		info.iBack = 0;
-	}
-	else
-	{
-		info.iFront = GetClosestNextPointIndexDirectionFast(trajectory, p, prevIndex);
-
-		if(info.iFront > 0)
-			info.iBack = info.iFront -1;
-		else
-			info.iBack = 0;
-
-		if(info.iFront == 0)
-		{
-			p0 = trajectory.at(info.iFront);
-			p1 = trajectory.at(info.iFront+1);
-		}
-		else if(info.iFront > 0 && info.iFront < trajectory.size()-1)
-		{
-			p0 = trajectory.at(info.iFront-1);
-			p1 = trajectory.at(info.iFront);
-		}
-		else
-		{
-			p0 = trajectory.at(info.iFront-1);
-			p1 = WayPoint((p0.pos.x+trajectory.at(info.iFront).pos.x)/2.0, (p0.pos.y+trajectory.at(info.iFront).pos.y)/2.0, (p0.pos.z+trajectory.at(info.iFront).pos.z)/2.0, p0.pos.a);
-		}
-	}
-
-	WayPoint prevWP = p0;
-	Mat3 rotationMat(-p1.pos.a);
-	Mat3 translationMat(-p.pos.x, -p.pos.y);
-	Mat3 invRotationMat(p1.pos.a);
-	Mat3 invTranslationMat(p.pos.x, p.pos.y);
-
-	p0.pos = translationMat*p0.pos;
-	p0.pos = rotationMat*p0.pos;
-
-	p1.pos = translationMat*p1.pos;
-	p1.pos = rotationMat*p1.pos;
-
-	double m = (p1.pos.y-p0.pos.y)/(p1.pos.x-p0.pos.x);
-	info.perp_distance = p1.pos.y - m*p1.pos.x; // solve for x = 0
-
-	if(std::isnan(info.perp_distance) || std::isinf(info.perp_distance)) info.perp_distance = 0;
-
-	info.to_front_distance = fabs(p1.pos.x); // distance on the x axes
-
-
-	info.perp_point = p1;
-	info.perp_point.pos.x = 0; // on the same y axis of the car
-	info.perp_point.pos.y = info.perp_distance; //perp distance between the car and the trajectory
-
-	info.perp_point.pos = invRotationMat  * info.perp_point.pos;
-	info.perp_point.pos = invTranslationMat  * info.perp_point.pos;
-
-	info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
-
-	info.angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(p1.pos.a, p.pos.a)*RAD2DEG;
-
-	return true;
-}
 
 bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
 {
+
+	// std::cout << "trajectory.size(): " << trajectory.size() << std::endl;
+
 	if(trajectory.size() < 2) return false;
 
 	WayPoint p0, p1;
@@ -193,6 +126,13 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 	else
 	{
 		info.iFront = GetClosestNextPointIndexFast(trajectory, p, prevIndex);
+		// std::cout << "previous index " << prevIndex << std::endl;
+		// std::cout << "lane id " << p.laneId << std::endl;
+		// std::cout << "lane pointer " << p.pLane << std::endl;
+		// std::cout << "x " << p.pos.x << std::endl;
+		// std::cout << "y " << p.pos.x << std::endl;
+		// std::cout << "from ids" << p.fromIds.size() << std::endl;
+
 //		WayPoint p2 = p;
 //		int old_index = GetClosestNextPointIndex(trajectory, p2, prevIndex);
 //		if(old_index != info.iFront)
@@ -398,177 +338,6 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 		info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
 
 		info.angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(p1.pos.a, p.pos.a)*RAD2DEG;
-
-		info.bAfter = false;
-		info.bBefore = false;
-
-		if(info.iFront == 0)
-		{
-			info.bBefore = true;
-		}
-		else if(info.iFront == trajectory.size()-1)
-		{
-			int s = trajectory.size();
-			double angle_befor_last = UtilityHNS::UtilityH::FixNegativeAngle(atan2(trajectory.at(s-2).pos.y - trajectory.at(s-1).pos.y, trajectory.at(s-2).pos.x - trajectory.at(s-1).pos.x));
-			double angle_from_perp = UtilityHNS::UtilityH::FixNegativeAngle(atan2(info.perp_point.pos.y - trajectory.at(s-1).pos.y, info.perp_point.pos.x - trajectory.at(s-1).pos.x));
-			double diff_last_perp = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(angle_befor_last, angle_from_perp);
-			info.after_angle = diff_last_perp;
-			if(diff_last_perp > M_PI_2)
-			{
-				info.bAfter = true;
-			}
-
-		}
-	}
-
-	return true;
-}
-
-bool PlanningHelpers::GetRelativeInfoDirectionLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
-{
-	if(trajectory.size() < 2) return false;
-
-	WayPoint p0, p1;
-
-	if(trajectory.size()==2)
-	{
-		vector<WayPoint> _trajectory;
-		p0 = trajectory.at(0);
-		p1 = p0;
-		p1 = WayPoint((trajectory.at(0).pos.x+trajectory.at(1).pos.x)/2.0,
-					  (trajectory.at(0).pos.y+trajectory.at(1).pos.y)/2.0,
-					  (trajectory.at(0).pos.z+trajectory.at(1).pos.z)/2.0, trajectory.at(0).pos.a);
-		_trajectory.push_back(p0);
-		_trajectory.push_back(p1);
-		_trajectory.push_back(trajectory.at(1));
-
-		info.iFront = GetClosestNextPointIndexDirectionFast(_trajectory, p, prevIndex);
-		if(info.iFront > 0)
-			info.iBack = info.iFront -1;
-		else
-			info.iBack = 0;
-
-		if(info.iFront == 0)
-		{
-			p0 = _trajectory.at(info.iFront);
-			p1 = _trajectory.at(info.iFront+1);
-		}
-		else if(info.iFront > 0 && info.iFront < _trajectory.size()-1)
-		{
-			p0 = _trajectory.at(info.iFront-1);
-			p1 = _trajectory.at(info.iFront);
-		}
-		else
-		{
-			p0 = _trajectory.at(info.iFront-1);
-			p1 = WayPoint((p0.pos.x+_trajectory.at(info.iFront).pos.x)/2.0, (p0.pos.y+_trajectory.at(info.iFront).pos.y)/2.0, (p0.pos.z+_trajectory.at(info.iFront).pos.z)/2.0, p0.pos.a);
-		}
-
-		WayPoint prevWP = p0;
-		Mat3 rotationMat(-p1.pos.a);
-		Mat3 translationMat(-p.pos.x, -p.pos.y);
-		Mat3 invRotationMat(p1.pos.a);
-		Mat3 invTranslationMat(p.pos.x, p.pos.y);
-
-		p0.pos = translationMat*p0.pos;
-		p0.pos = rotationMat*p0.pos;
-
-		p1.pos = translationMat*p1.pos;
-		p1.pos = rotationMat*p1.pos;
-
-		double m = (p1.pos.y-p0.pos.y)/(p1.pos.x-p0.pos.x);
-		info.perp_distance = p1.pos.y - m*p1.pos.x; // solve for x = 0
-
-		if(std::isnan(info.perp_distance) || std::isinf(info.perp_distance)) info.perp_distance = 0;
-
-		info.to_front_distance = fabs(p1.pos.x); // distance on the x axes
-
-		info.perp_point = p1;
-		info.perp_point.pos.x = 0; // on the same y axis of the car
-		info.perp_point.pos.y = info.perp_distance; //perp distance between the car and the _trajectory
-
-		info.perp_point.pos = invRotationMat  * info.perp_point.pos;
-		info.perp_point.pos = invTranslationMat  * info.perp_point.pos;
-
-		info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
-
-		info.angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(p1.pos.a, p.pos.a)*RAD2DEG;
-
-		info.bAfter = false;
-		info.bBefore = false;
-
-		if(info.iFront == 0)
-		{
-			info.bBefore = true;
-		}
-		else if(info.iFront == _trajectory.size()-1)
-		{
-			int s = _trajectory.size();
-			double angle_befor_last = UtilityHNS::UtilityH::FixNegativeAngle(atan2(_trajectory.at(s-2).pos.y - _trajectory.at(s-1).pos.y, _trajectory.at(s-2).pos.x - _trajectory.at(s-1).pos.x));
-			double angle_from_perp = UtilityHNS::UtilityH::FixNegativeAngle(atan2(info.perp_point.pos.y - _trajectory.at(s-1).pos.y, info.perp_point.pos.x - _trajectory.at(s-1).pos.x));
-			double diff_last_perp = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(angle_befor_last, angle_from_perp);
-			info.after_angle = diff_last_perp;
-			if(diff_last_perp > M_PI_2)
-			{
-				info.bAfter = true;
-			}
-
-		}
-	}
-	else
-	{
-		info.iFront = GetClosestNextPointIndexDirectionFast(trajectory, p, prevIndex);
-		if(info.iFront > 0)
-			info.iBack = info.iFront -1;
-		else
-			info.iBack = 0;
-
-		if(info.iFront == 0)
-		{
-			p0 = trajectory.at(info.iFront);
-			p1 = trajectory.at(info.iFront+1);
-		}
-		else if(info.iFront > 0 && info.iFront < trajectory.size()-1)
-		{
-			p0 = trajectory.at(info.iFront-1);
-			p1 = trajectory.at(info.iFront);
-		}
-		else
-		{
-			p0 = trajectory.at(info.iFront-1);
-			p1 = WayPoint((p0.pos.x+trajectory.at(info.iFront).pos.x)/2.0, (p0.pos.y+trajectory.at(info.iFront).pos.y)/2.0, (p0.pos.z+trajectory.at(info.iFront).pos.z)/2.0, p0.pos.a);
-		}
-
-		WayPoint prevWP = p0;
-		Mat3 rotationMat(-p1.pos.a);
-		Mat3 translationMat(-p.pos.x, -p.pos.y);
-		Mat3 invRotationMat(p1.pos.a);
-		Mat3 invTranslationMat(p.pos.x, p.pos.y);
-
-		p0.pos = translationMat*p0.pos;
-		p0.pos = rotationMat*p0.pos;
-
-		p1.pos = translationMat*p1.pos;
-		p1.pos = rotationMat*p1.pos;
-
-		double m = (p1.pos.y-p0.pos.y)/(p1.pos.x-p0.pos.x);
-		info.perp_distance = p1.pos.y - m*p1.pos.x; // solve for x = 0
-
-		if(std::isnan(info.perp_distance) || std::isinf(info.perp_distance)) info.perp_distance = 0;
-
-		info.to_front_distance = fabs(p1.pos.x); // distance on the x axes
-
-		info.perp_point = p1;
-		info.perp_point.pos.x = 0; // on the same y axis of the car
-		info.perp_point.pos.y = info.perp_distance; //perp distance between the car and the trajectory
-
-		info.perp_point.pos = invRotationMat  * info.perp_point.pos;
-		info.perp_point.pos = invTranslationMat  * info.perp_point.pos;
-
-		info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
-
-		info.angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(p1.pos.a, p.pos.a)*RAD2DEG;
-
 		info.bAfter = false;
 		info.bBefore = false;
 
@@ -645,6 +414,12 @@ WayPoint PlanningHelpers::GetFollowPointOnTrajectory(const std::vector<WayPoint>
 
 	//condition 1, if far behind the first point on the trajectory
 	int local_i = init_p.iFront;
+
+	// std::cout << "iFront: " << init_p.iFront << std::endl;
+	// std::cout << "iGlobalPath: " << init_p.iGlobalPath << std::endl;
+	// std::cout << "iBack: " << init_p.iBack << std::endl;
+	// std::cout << "perp_distance: " << init_p.perp_distance << std::endl;
+	// std::cout << "tofront_distance: " << init_p.to_front_distance << std::endl;
 
 	if(init_p.iBack == 0 && init_p.iBack == init_p.iFront && init_p.from_back_distance > distance)
 	{
@@ -872,7 +647,9 @@ int PlanningHelpers::GetClosestNextPointIndexFastV2(const vector<WayPoint>& traj
 
 int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )
 {
+	// std::cout << "****** GetClosestNextPointIndexFast *****" << std::endl;
 	int size = (int)trajectory.size();
+	// std::cout << "****** size *****" << size << std::endl;
 
 		if(size < 2 || prevIndex < 0) return 0;
 
@@ -880,48 +657,91 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 		int min_index  = prevIndex;
 		int iStart = prevIndex;
 		int iEnd = size;
-		double resolution = hypot(trajectory[1].pos.y -trajectory[0].pos.y , trajectory[1].pos.x -trajectory[0].pos.x);
+		float resolution = hypot(trajectory[1].pos.y -trajectory[0].pos.y , trajectory[1].pos.x -trajectory[0].pos.x);
 
 		//divide every 5 meters
-		int skip_factor = 5;
+		float skip_factor = 5.0;
 		if(resolution > skip_factor)
 			resolution = skip_factor;
 
+		// std::cout << "****** resolution *****: " << resolution << std::endl;
 
-		int skip = 1;
-		if(resolution > 0)
+
+		float skip = 1.0;
+		if(resolution > 0.0)
 			skip = skip_factor/resolution;
+		if(skip > 2147483647)
+			skip = (float)2147483646;
 
-		for(int i=0; i< size; i+=skip)
+		// std::cout << "****** double skip *****" << skip << std::endl;
+		// std::cout << "****** int skip *****" << (int)skip << std::endl;
+
+		for(int i=0; i< size; i+= (int)skip)
 		{
-			if(i+skip/2 < size)
-				d  = (distance2pointsSqr(trajectory[i].pos, p.pos) + distance2pointsSqr(trajectory[i+skip/2].pos, p.pos))/2.0;
+			// std::cout << "****** i *****" << i << std::endl;
+			// std::cout << "****** trajectory[0].pos.x *****" << trajectory[0].pos.x << std::endl;
+			// std::cout << "****** (int)(skip / 2.0) " << (int)(skip / 2.0) << ", size " << size << "***** bool " << ((int)(skip / 2.0) < size && (int)(skip / 2.0) >= 0)<< std::endl;
+			if((int)(skip / 2.0) < size && (int)(skip / 2.0) >= 0)
+			{
+				// std::cout << "****** trajectory[0+skip/2].pos.x *****" << trajectory[(int)(skip / 2.0)].pos.x << std::endl;
+				// std::cout << "****** post trajectory[0+skip/2].pos.x *****" << std::endl;
+				d  = (distance2pointsSqr(trajectory[i].pos, p.pos) + distance2pointsSqr(trajectory[(int)(skip / 2.0)].pos, p.pos))/2.0;
+			}
 			else
-				d  = distance2pointsSqr(trajectory[i].pos, p.pos);
+			{
+				// std::cout << "****** else statement (int)(skip / 2.0) < size  *****" << std::endl;
+				if (i < size && i >=0)
+				{
+					// std::cout << "****** if i < size && i >=0  *****"<< (i < size && i >=0) << std::endl;
+					// std::cout << "****** i  ***** "<< i << std::endl;
+					
+					d  = distance2pointsSqr(trajectory[i].pos, p.pos);
+					// std::cout << "****** d  ***** "<< d << std::endl;
+				}
+			}
+			// std::cout << "****** minD  ***** "<< minD << std::endl;	
+			// std::cout << "****** bool d < minD  ***** "<< (d < minD) << std::endl;
+			// std::cout << "****** min_index if(d < minD)1*****: " << min_index << std::endl;
+			
 			if(d < minD)
 			{
-				iStart = i-skip;
-				iEnd = i+skip;
+				iStart = i-(int)skip;
+				iEnd = i+(int)skip;
 				minD = d;
 				min_index = i;
 			}
+			// std::cout << "****** minD  ***** "<< minD << std::endl;	
 		}
-
-		if((size - skip/2 - 1) > 0)
-			d  = (distance2pointsSqr(trajectory[size-1].pos, p.pos) + distance2pointsSqr(trajectory[size - skip/2 -1 ].pos, p.pos))/2.0;
-		else
-			d  = distance2pointsSqr(trajectory[size-1].pos, p.pos);
-
-		if(d < minD)
+		// std::cout << "****** Reached this POINT  *****" << std::endl;
+		if((size - (int)(skip / 2.0) - 1) > 0)
 		{
-			iStart = size-skip;
-			iEnd = size+skip;
-			minD = d;
-			min_index = size-1;
+			// std::cout << "****** this *****: " << std::endl;
+			// std::cout << "****** trajectory.size() *****: "<< trajectory.size() << std::endl;
+			// std::cout << "****** index in trajectory *****: " << size - (int)(skip/2.0) -1 << std::endl;
+			d  = (distance2pointsSqr(trajectory[size-1].pos, p.pos) + distance2pointsSqr(trajectory[size - (int)(skip/2.0) -1 ].pos, p.pos))/2.0;
 		}
+		else
+		{
+			// std::cout << "****** that *****: " << std::endl;
+			d  = distance2pointsSqr(trajectory[size-1].pos, p.pos);
+		}
+		
+
+		// std::cout << "****** min_index *****: " << min_index << std::endl;
+		// std::cout << "****** d *****: " << d << std::endl;
+		// std::cout << "****** minD *****: " << minD << std::endl;
+		// if(d < minD)
+		// {
+		// 	iStart = size-skip;
+		// 	iEnd = size+skip;
+		// 	minD = d;
+		// 	min_index = size-1;
+		// }
 
 		if(iStart < 0) iStart = 0;
 		if(iEnd >= size) iEnd = size -1;
+
+		// std::cout << "****** min_index *****: " << min_index << std::endl;
 
 		for(int i=iStart; i< iEnd; i++)
 		{
@@ -953,27 +773,23 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 		return min_index;
 }
 
-int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex, const bool& debug)
+int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )
 {
 	int size = (int)trajectory.size();
 
 	if(size < 2 || prevIndex < 0) return 0;
 
-	double d = 0, minD = DBL_MAX;
+	double d = 0, minD = DBL_MAX, angle_diff = 100000;
 	int min_index  = prevIndex;
-	double min_angle = DBL_MAX;
 
 	for(unsigned int i=prevIndex; i< size; i++)
 	{
 		d  = distance2pointsSqr(trajectory.at(i).pos, p.pos);
-		double angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(trajectory.at(i).pos.a, p.pos.a)*RAD2DEG;
-		double index_diff = (int)i - prevIndex; //just for carla
-		//if(d < minD && angle_diff < 45)
-		if(d < minD && angle_diff < 45 && index_diff < 100) //just for carla
+		angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(trajectory.at(i).pos.a, p.pos.a)*RAD2DEG;
+		if(d < minD && angle_diff < 45)
 		{
 			min_index = i;
 			minD = d;
-			min_angle = angle_diff;
 		}
 	}
 
@@ -989,14 +805,7 @@ int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint
 		double dot_pro = v_1.x*v_2.x + v_1.y*v_2.y;
 		double a = UtilityHNS::UtilityH::FixNegativeAngle(acos(dot_pro/(norm1*norm2)));
 		if(a <= M_PI_2)
-		{
 			min_index = min_index+1;
-		}
-	}
-
-	if(debug)
-	{
-		std::cout << std::endl << "  MinIndex: " << min_index << ", PrevIndex: " << prevIndex << ", MinDist: " << minD << ", MinAngle: " << min_angle << std::endl;
 	}
 
 	return min_index;
@@ -1275,10 +1084,13 @@ double PlanningHelpers::GetDistanceToClosestStopLineAndCheck(const std::vector<W
 
 	RelativeInfo info;
 	GetRelativeInfo(path, p, info, prevIndex);
+
 	for(unsigned int i=info.iBack; i<path.size(); i++)
-	{		
+	{
 		if(path.at(i).stopLineID > 0 && path.at(i).pLane)
 		{
+			// std::cout << "+++++ Found a linked Stop Line (with id " << path.at(i).stopLineID << ") +++++" << std::endl;
+
 			for(unsigned int j = 0; j < path.at(i).pLane->stopLines.size(); j++)
 			{
 				if(path.at(i).pLane->stopLines.at(j).id == path.at(i).stopLineID)
@@ -1290,12 +1102,18 @@ double PlanningHelpers::GetDistanceToClosestStopLineAndCheck(const std::vector<W
 					stopLineWP = path.at(i).pLane->stopLines.at(j).points.at(0);
 					GetRelativeInfo(path, stopLineWP, stop_info);
 					double localDistance = GetExactDistanceOnTrajectory(path, info, stop_info);
+					// std::cout << "+++++ localDistance: " << localDistance << " giveUpDistance: " << giveUpDistance << std::endl;
 
 					if(localDistance > giveUpDistance)
 					{
 						stopSignID = path.at(i).pLane->stopLines.at(j).stopSignID;
+						// std::cout << "+++++ path.at(i).pLane->stopLines.at(j).id: " << path.at(i).pLane->stopLines.at(j).id << std::endl;
+						// std::cout << "+++++ path.at(i).pLane->stopLines.at(j).lightIds.size(): " << path.at(i).pLane->stopLines.at(j).lightIds.size() << " path.at(i).pLane->stopLines.size(): " << path.at(i).pLane->stopLines.size() << " pointer: " << path.at(i).pLane << std::endl;
 						if(path.at(i).pLane->stopLines.at(j).lightIds.size() > 0)
+						{
+							// std::cout << "+++++ found lightId: " << path.at(i).pLane->stopLines.at(j).lightIds.at(0) << std::endl;	
 							trafficLightID = path.at(i).pLane->stopLines.at(j).lightIds.at(0);
+						}
 						return localDistance;
 					}
 				}
@@ -1701,25 +1519,25 @@ double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& l
 	if(path.size() == 2)
 	{
 		path[0].pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x ));
-		path[0].distanceCost = lastCost;
+		path[0].cost = lastCost;
 		path[1].pos.a = path[0].pos.a;
-		path[1].distanceCost = path[0].distanceCost +  distance2points(path[0].pos, path[1].pos);
-		return path[1].distanceCost;
+		path[1].cost = path[0].cost +  distance2points(path[0].pos, path[1].pos);
+		return path[1].cost;
 	}
 
 	path[0].pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x ));
-	path[0].distanceCost = lastCost;
+	path[0].cost = lastCost;
 
 	for(int j = 1; j < path.size()-1; j++)
 	{
 		path[j].pos.a 		= UtilityHNS::UtilityH::FixNegativeAngle(atan2(path[j+1].pos.y - path[j].pos.y, path[j+1].pos.x - path[j].pos.x ));
-		path[j].distanceCost 	= path[j-1].distanceCost +  distance2points(path[j-1].pos, path[j].pos);
+		path[j].cost 	= path[j-1].cost +  distance2points(path[j-1].pos, path[j].pos);
 	}
 
 	int j = (int)path.size()-1;
 
 	path[j].pos.a 		= path[j-1].pos.a;
-	path[j].distanceCost 	= path[j-1].distanceCost + distance2points(path[j-1].pos, path[j].pos);
+	path[j].cost 	= path[j-1].cost + distance2points(path[j-1].pos, path[j].pos);
 
 	for(int j = 0; j < path.size()-1; j++)
 	{
@@ -1727,37 +1545,41 @@ double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& l
 			path.at(j).pos.a = path.at(j+1).pos.a;
 	}
 
-	return path[j].distanceCost;
+	return path[j].cost;
 }
 
-void PlanningHelpers::CalcAngleAndCurvatureCost(vector<WayPoint>& path)
+double PlanningHelpers::CalcAngleAndCostAndCurvatureAnd2D(vector<WayPoint>& path, const double& lastCost)
 {
-	if(path.size() < 2) return;
-
+	if(path.size() < 2) return -1;
 	path[0].pos.a 	= atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x );
-
+	path[0].cost 	= lastCost;
+	
 	double k = 0;
 	GPSPoint center;
-
+	// std::cout << "track size: " << path.size() << std::endl;
 	for(unsigned int j = 1; j < path.size()-1; j++)
 	{
 		k =  CalcCircle(path[j-1].pos,path[j].pos, path[j+1].pos, center);
-		if(k > 150.0 || std::isnan(k))
-			k = 150.0;
+		// std::cout << "index: " << j << " | k: " <<  k << std::endl;
+		if(k > 800.0 || std::isnan(k))
+			k = 800.0;
 
 		if(k<1.0)
-			path[j].curvatureCost = 0;
+			path[j].cost = 0;
 		else
-			path[j].curvatureCost = 1.0-1.0/k;
-
+			path[j].cost = 1.0-1.0/k;
+			
 		path[j].pos.a 	= atan2(path[j+1].pos.y - path[j].pos.y, path[j+1].pos.x - path[j].pos.x );
+		
 	}
 	unsigned int j = path.size()-1;
 
-	path[0].curvatureCost    = path[1].curvatureCost;
-	path[j].curvatureCost 	= path[j-1].curvatureCost;
+	path[0].cost    = path[1].cost;
+	path[j].cost 	= path[j-1].cost;
 	path[j].pos.a 	= path[j-1].pos.a;
-	path[j].curvatureCost 	= path[j-1].curvatureCost ;
+	path[j].cost 	= path[j-1].cost ;
+
+	return path[j].cost;
 }
 
 double PlanningHelpers::CalcCircle(const GPSPoint& pt1, const GPSPoint& pt2, const GPSPoint& pt3, GPSPoint& center)
@@ -1848,7 +1670,7 @@ void PlanningHelpers::CalcDtLaneInfo(vector<WayPoint>& path)
 
 	path.at(0).rot.z = UtilityHNS::UtilityH::FixNegativeAngle(atan2(path.at(1).pos.y - path.at(0).pos.y, path.at(1).pos.x - path.at(0).pos.x));
 	path.at(0).rot.w = r_limit;
-	path.at(0).distanceCost = 0;
+	path.at(0).cost = 0;
 	path.at(0).rot.y = 0;
 
 	for(int j = 1; j < path.size()-1; j++)
@@ -1865,7 +1687,7 @@ void PlanningHelpers::CalcDtLaneInfo(vector<WayPoint>& path)
 		double z_diff = path.at(j).pos.z - path.at(j-1).pos.z;
 		double a = sqrt((d*d) - (z_diff*z_diff));
 
-		path.at(j).distanceCost = path.at(j-1).distanceCost + d;
+		path.at(j).cost = path.at(j-1).cost + d;
 		if(a != 0)
 		{
 			path.at(j).rot.y = (z_diff/a) * 100.0; // percentile road slope calculation
@@ -1887,7 +1709,7 @@ void PlanningHelpers::CalcDtLaneInfo(vector<WayPoint>& path)
 	double z_diff = path.at(j).pos.z - path.at(j-1).pos.z;
 	double a = sqrt(d*d - z_diff*z_diff);
 
-	path.at(j).distanceCost = path.at(j-1).distanceCost + d;
+	path.at(j).cost = path.at(j-1).cost + d;
 
 	if(a != 0)
 	{
@@ -1904,13 +1726,14 @@ int PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(const vector<Wa
 
 	int close_index = GetClosestNextPointIndexDirectionFast(originalPath, pos, prev_index);
 	double d = 0;
-
+	// std::cout <<"##################### close index " << close_index << std::endl; 
 	if(close_index + 1 >= originalPath.size())
 		close_index = originalPath.size() - 2;
 
 	for(int i=close_index; i >=  0; i--)
 	{
 		extractedPath.insert(extractedPath.begin(),  originalPath.at(i));
+		// std::cout << "######################## v : "<< originalPath.at(i).v<< "an Index : " << i << std::endl;
 		if(i < originalPath.size())
 			d += hypot(originalPath.at(i).pos.y - originalPath.at(i+1).pos.y, originalPath.at(i).pos.x - originalPath.at(i+1).pos.x);
 		if(d > 10)
@@ -1935,6 +1758,7 @@ int PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(const vector<Wa
 	}
 
 	FixPathDensity(extractedPath, pathDensity);
+	// std::cout << "######################## v : "<< extractedPath.at(1).v<< "an Index : " << close_index << " at:  1 " << std::endl;
 	CalcAngleAndCost(extractedPath);
 
 	return close_index;
@@ -1992,14 +1816,10 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	WayPoint p;
 
 	//Get Closest Index
-	double initial_roll_in_distance = 0;
-	int close_index = -1;
 	RelativeInfo info;
-	GetRelativeInfoDirection(originalCenter, carPos, info);
-	close_index = info.iBack;
-	initial_roll_in_distance = info.perp_distance ; //GetPerpDistanceToTrajectorySimple(originalCenter, carPos, close_index);
-
+	GetRelativeInfo(originalCenter, carPos, info);
 	double remaining_distance = 0;
+	int close_index = info.iBack;
 	for(unsigned int i=close_index; i< originalCenter.size()-1; i++)
 	{
 		if(i>0)
@@ -2013,6 +1833,8 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	{
 		nRollOuts = 0;
 	}
+
+	double initial_roll_in_distance = info.perp_distance ; //GetPerpDistanceToTrajectorySimple(originalCenter, carPos, close_index);
 
 	vector<WayPoint> RollOutStratPath;
 	///***   Smoothing From Car Heading Section ***///
@@ -2275,7 +2097,6 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	for(unsigned int i=0; i< nRollOuts+1 ; i++)
 	{
 		SmoothPath(rollInPaths.at(i), SmoothDataWeight, SmoothWeight, SmoothTolerance);
-		CalcAngleAndCost(rollInPaths.at(i));
 	}
 }
 
@@ -2361,11 +2182,9 @@ void PlanningHelpers::SmoothSpeedProfiles(vector<WayPoint>& path_in, double weig
 void PlanningHelpers::SmoothCurvatureProfiles(vector<WayPoint>& path_in, double weight_data, double weight_smooth, double tolerance)
 {
 	if (path_in.size() <= 1)
-	{
-		return;
-	}
-
+			return;
 	vector<WayPoint> newpath = path_in;
+
 	double change = tolerance;
 	double xtemp;
 	int nIterations = 0;
@@ -2376,10 +2195,10 @@ void PlanningHelpers::SmoothCurvatureProfiles(vector<WayPoint>& path_in, double 
 		change = 0.0;
 		for (int i = 1; i < size -1; i++)
 		{
-			xtemp = newpath[i].curvatureCost;
-			newpath[i].curvatureCost += weight_data * (path_in[i].curvatureCost - newpath[i].curvatureCost);
-			newpath[i].curvatureCost += weight_smooth * (newpath[i - 1].curvatureCost + newpath[i + 1].curvatureCost - (2.0 * newpath[i].curvatureCost));
-			change += fabs(xtemp - newpath[i].curvatureCost);
+			xtemp = newpath[i].cost;
+			newpath[i].cost += weight_data * (path_in[i].cost - newpath[i].cost);
+			newpath[i].cost += weight_smooth * (newpath[i - 1].cost + newpath[i + 1].cost - (2.0 * newpath[i].cost));
+			change += fabs(xtemp - newpath[i].cost);
 
 		}
 		nIterations++;
@@ -2447,7 +2266,7 @@ void PlanningHelpers::SmoothZ(vector<WayPoint>& path_in, double weight_data, dou
 
 void PlanningHelpers::SmoothGlobalPathSpeed(vector<WayPoint>& path)
 {
-	CalcAngleAndCurvatureCost(path);
+	CalcAngleAndCostAndCurvatureAnd2D(path);
 	SmoothSpeedProfiles(path, 0.45,0.25, 0.01);
 }
 
@@ -2509,41 +2328,142 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
-void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor)
+void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max , double a_x_max ,double jerk )
 {
-	CalcAngleAndCurvatureCost(path);
+	CalcAngleAndCostAndCurvatureAnd2D(path);
 	SmoothCurvatureProfiles(path, 0.4, 0.3, 0.01);
+    
+	
+	
+	 
 	double v = 0;
-
+	double a_x_lim = a_x_max;
+	// std::cout << "track size: " << path.size() << std::endl;
 	for(unsigned int i = 0 ; i < path.size(); i++)
-	{
-		double k_ratio = path.at(i).curvatureCost*10.0;
+	{	
+		
+		// original solution according to a costfunction:
+		// double local_max = path.at(i).v;
+		// if(local_max == 0)
+		// 	local_max = max_speed;
+		// else if(local_max > max_speed)
+		// 	local_max = max_speed;
+		// double k_ratio = path.at(i).cost*10.0;
+		// if(k_ratio >= 9.5)
+		// 	v = local_max;
+		// else if(k_ratio <= 8.5)
+		// 	v = 1.0*speedProfileFactor;
+		// else
+		// {
+		// 	k_ratio = k_ratio - 8.5;
+		// 	v = (local_max - 1.0) * k_ratio + 1.0;
+		// 	v = v*speedProfileFactor;
+		// }
+		// if(v > max_speed)
+		// 	path.at(i).v = max_speed;
+		// else
+		// 	path.at(i).v = v;
+		
 
-		double local_max = path.at(i).v;
+		double local_max = path.at(path.size()-i-1).v;
 		if(local_max == 0)
 			local_max = max_speed;
 		else if(local_max > max_speed)
 			local_max = max_speed;
+		double radi = 1000; 
 
-		if(k_ratio >= 9.5)
-			v = local_max;
-		else if(k_ratio <= 8.5)
-			v = 1.0*speedProfileFactor;
-		else
+		
+		if ((i>0) & (i<(path.size()-1) ))
 		{
-			k_ratio = k_ratio - 8.5;
-			v = (local_max - 1.0) * k_ratio + 1.0;
-			v = v*speedProfileFactor;
+			GPSPoint center;
+			radi = CalcCircle(path[path.size()-i-2].pos,path[path.size()-i-1].pos,path[path.size()-i].pos,center);
+			if (radi >1000 || std::isnan(radi))
+			{	
+				radi = 1000;
+			}
+			v = sqrt(radi*a_y_max);
 		}
-
-		if(v > local_max)
-			path.at(i).v = local_max;
 		else
-			path.at(i).v = v;
-
+			v=local_max;
+		
+		// limit acceleration of the speed profile backward calculation.
+		if (i>0)
+		{
+			double time_path_sequence = distance2points(path[path.size()-i].pos,path[path.size()-i-1].pos)/path.at(path.size()-i).v;
+			// limitation of speed at the end of track
+			
+			
+			if (i>1)
+			{
+				if (path.at(path.size()-i+1).v>path.at(path.size()-i).v) 
+				{
+					a_x_lim = 0;
+					//std::cout << "reseten der ax_limited:" << std::endl;
+				}
+				else 
+				{
+					a_x_lim = a_x_lim + time_path_sequence*jerk;
+				}
+				if (a_x_lim > a_x_max)	
+				a_x_lim = a_x_max;
+			}	
+			double v_acc_lim = path.at(path.size()-i).v+time_path_sequence*a_x_lim;
+			if(v > v_acc_lim)
+			v= v_acc_lim;
+		}
+		
+		// limit speed to zero at the end of track.
+		if (i==0) {
+			v=0;
+			// std::cout << "index: " << i << " | v am Ende: " << v << std::endl;
+		}
+		
+		// limitation of the speed at the end of track
+		if (i==1)
+			{
+				v = sqrt(distance2points(path[path.size()-i].pos,path[path.size()-i-1].pos)*2/a_x_max);
+				// std::cout << "index: " << i << " | v: " << path.at(i).v << std::endl;
+			}
+		
+		if(v > local_max)
+			path.at(path.size()-i-1).v = local_max;
+		else
+			path.at(path.size()-i-1).v = v;
+	}
+	// limit longitudinal acceleration. forward calcualtion.
+	for(unsigned int i = 0 ; i < path.size()-1; i++)
+	{
+		double v = path.at(i+1).v;
+		// limit acceleration of the speed profile forward calculation.
+			double time_path_sequence = distance2points(path[i].pos,path[i+1].pos)/path.at(i).v;
+			
+				if (path.at(i+1).v<path.at(i).v) 
+				{
+					a_x_lim = 0;
+					//std::cout << "reseten der ax_limited:" << std::endl;
+				}
+				else 
+				{
+					a_x_lim = a_x_lim + time_path_sequence*jerk;
+				}
+				if (a_x_lim > a_x_max)	
+				a_x_lim = a_x_max;
+			
+			double v_acc_lim = path.at(i).v+time_path_sequence*a_x_lim;
+			//  std::cout << "index: " << path.size()-i-1 <<"  | vacc_lim: " <<v_acc_lim<<"  | v       : " <<v<< "  |  a_x_lim:  "<< a_x_lim<< std::endl;
+			if(v>v_acc_lim)
+				{v= v_acc_lim; }
+		if(v > max_speed)
+			path.at(i+1).v = max_speed;
+		else
+			path.at(i+1).v = v;
 	}
 
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
+	// for(unsigned int i = 0 ; i < path.size(); i++)
+	// {
+	// 	std::cout << "index: " << i << " | v: " << path.at(i).v << std::endl;
+	// }
 }
 
 double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
@@ -2552,43 +2472,52 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params);
 	double desiredVel = 0;
 	double target_a = 0;
+	double control_distance = 0;  // distance for a cascaded speed controller
+	double safety_distance = 10; // additional constant safety distance 
+	double max_deceleration = 2.0; // vehicleInfo.max_deceleration
+	double ACCcontrolgain = 0.5;
+	double delta_speed = 0;
+	
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
-		double coastingOffset = 1.0;  // [m/s] 
-		if (CurrSpeed < CurrBehavior.maxVelocity-coastingOffset)
-		{
-			desiredVel = CurrSpeed+vehicleInfo.max_acceleration*dt;
-		}else{
-			desiredVel = CurrSpeed+vehicleInfo.max_deceleration*dt;
-		}
+		// The current velocity should never be part of the target velocity. To avoid harsh acceleration, the output of the velocity controller must be limited.
+		// double coastingOffset = 1.0;  // [m/s] 
+		// if (CurrSpeed < CurrBehavior.maxVelocity-coastingOffset)
+		// {
+		// 	desiredVel = CurrSpeed+vehicleInfo.max_acceleration*dt;
+		// }else{
+		// 	desiredVel = CurrSpeed+vehicleInfo.max_deceleration*dt;
+		// }
+	  desiredVel = CurrBehavior.maxVelocity;	
 	}
 	else if(CurrBehavior.state == STOPPING_STATE || CurrBehavior.state == TRAFFIC_LIGHT_STOP_STATE || CurrBehavior.state == STOP_SIGN_STOP_STATE)
 	{
 		double distance_to_follow = CurrBehavior.followDistance;	// Distance to vehicle ahead
 		double distance_to_stopline = CurrBehavior.stopLineDistance;
-
-		std::cout << "distance_to_stopline " << distance_to_stopline << std::endl;
-
 		bool validObjectDistanceToFollow = ACC_helper.isObjectAhead();
-
+ 
 		if(	distance_to_stopline <= (distance_to_follow) 
 			|| validObjectDistanceToFollow == false)
 		// Stop at the stopline
 		{
-			std::cout << "STOP AT STOPLINE" << std::endl;
-			target_a = ACC_helper.evaluateTargetAccleration(distance_to_stopline);
-			target_a = ACC_helper.applyPushFactors(target_a);
-			desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
-			desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_stopline, true);
+			// target_a = ACC_helper.evaluateTargetAccleration(distance_to_stopline);
+			// target_a = ACC_helper.applyPushFactors(target_a);
+			// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
+			// desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_stopline);
+			control_distance = (CurrSpeed * CurrSpeed)/2/max_deceleration+safety_distance-distance_to_stopline;
+			desiredVel = -control_distance * ACCcontrolgain; 
 		} 
 		else 
 		// Stopping behind a vehicle in front of us, which is waiting at the stopline (FOLLOW MODE)
 		{
-			target_a = ACC_helper.evaluateTargetAccleration(distance_to_follow);
-			target_a = ACC_helper.applyPushFactors(target_a);
-			desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
-			desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_follow, false);
+			delta_speed = CurrSpeed-CurrBehavior.followVelocity;
+			control_distance = (delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration+CurrBehavior.followVelocity*3.6/2.0+safety_distance-CurrBehavior.followDistance ;
+			desiredVel = CurrBehavior.followVelocity - control_distance * ACCcontrolgain;
+		// target_a = ACC_helper.evaluateTargetAccleration(distance_to_follow);
+			// target_a = ACC_helper.applyPushFactors(target_a);
+			// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
+			// desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_follow);
 		}
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
@@ -2599,18 +2528,32 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
-		target_a = ACC_helper.evaluateTargetAccleration(CurrBehavior.followDistance);
-		target_a = ACC_helper.applyPushFactors(target_a);
-		target_a = ACC_helper.slowDownInCurve(target_a);
-		desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
+		// target_a = ACC_helper.evaluateTargetAccleration(CurrBehavior.followDistance);
+		// target_a = ACC_helper.applyPushFactors(target_a);
+		// target_a = ACC_helper.slowDownInCurve(target_a);
+		// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
+		delta_speed = CurrSpeed-CurrBehavior.followVelocity;
+		control_distance = (delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration+CurrBehavior.followVelocity*3.6/2.0+safety_distance-CurrBehavior.followDistance ;
+		desiredVel = CurrBehavior.followVelocity - control_distance * ACCcontrolgain;
+		std::cout<< "# # # # # # follow speed " << CurrBehavior.followVelocity << "  follow distance: " << CurrBehavior.followDistance<< " delta speed:" <<delta_speed << "brake distance : " <<(delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration<<" control distance :" <<control_distance <<   std::endl;
+		
 	}
 	else
 	{
 	 	target_a = vehicleInfo.max_deceleration;
 	}
-
-	ACC_helper.limitMaxVelocity(desiredVel);
-
+		
+    if(desiredVel > CurrBehavior.maxVelocity)
+	{
+		desiredVel = CurrBehavior.maxVelocity;
+	}
+	if(desiredVel < 0)
+	{
+		desiredVel = 0;
+	}
+	// ACC_helper.limitMaxVelocity(desiredVel);   // Function is not working???
+	std::cout<< "Current behavior state " << CurrBehavior.state << "  target speed: " << desiredVel  << "  limit speed: " << CurrBehavior.maxVelocity <<  std::endl;
+	
 	return desiredVel;
 }
 
@@ -2632,17 +2575,13 @@ double ACCHelper::limitMaxVelocity(double desiredVel){
 	return desiredVel;
 }
 
-double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine){
-	double queue_length;
-	if (isStopLine) queue_length = 0.0; //standstill stop distance behind vehicle ahead;
-	else queue_length = 5.0;
-	
-	double gap_closing_acc = 1.0; // m/s²
+double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDistance){
+	double queue_length = 5.0; //standstill stop distance behind vehicle ahead;
+	double gap_closing_acc = 0.5; // m/s²
 	if (stopDistance > vehicleInfo.wheel_base+vehicleInfo.front_length+queue_length
 		&& CurrSpeed < 1.0)
 	{
 		currentDesiredVelocity = CurrSpeed+gap_closing_acc*dt;
-		currentDesiredVelocity = 1.0;
 	}
 	return currentDesiredVelocity;
 }
@@ -2666,6 +2605,7 @@ double ACCHelper::slowDownInCurve(double target_a){
 }
 
 double ACCHelper::evaluateDesiredVelocity(double target_a){
+	// the current velocity should never be used to determine a reference speed profile. 
 	if (target_a > vehicleInfo.max_acceleration) target_a = vehicleInfo.max_acceleration;
 	double desiredVel = (target_a * dt) + CurrSpeed;
 	return desiredVel;
@@ -2689,31 +2629,26 @@ double ACCHelper::applyPushFactors(double target_a){
 double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 
 	double targetAcceleration = 0;
-	double additional_safety = 5.0;
+	double additional_safety = 15.0;
 	double coastingOffset = CurrSpeed*2;
 	double targetDistance = distance_to_follow-(vehicleInfo.front_length+vehicleInfo.wheel_base+additional_safety);
-	double safeDistance = (CurrSpeed*3.6)/2; 	// this usually should be (CurrSpeed*3.6)/2 but we are using without /2 due 
+	double safeDistance = (CurrSpeed*3.6); 	// this usually should be (CurrSpeed*3.6)/2 but we are using without /2 due 
 											// to offsets compared to real vehicle beahvior 
-	double CoastDistance = safeDistance; 
+	double CoastDistance = safeDistance + coastingOffset; 
 	double emergencyBrakeDistance = (CurrSpeed*3.6/10)*(CurrSpeed*3.6/10);
-
-	std::cout << "----> " << targetDistance << std::endl;
 
 	if(targetDistance < safeDistance*2)
 	// If the difference between the brake distance and the vehicle ahead is smaller than twice the safe distance  
 	// for following a vehicle, coasting/braking is triggered.
 	{
 		// Decide COAST or BRAKE
-		std::cout << " -> Speed: " << CurrSpeed << std::endl;
 		if (targetDistance <= safeDistance*2
 			&& targetDistance > CoastDistance){
-			std::cout << " --> Vehicle Ahead detected" << std::endl;
+			// std::cout << "Vehicle Ahead detected" << std::endl;
 		}
 		else if(targetDistance <= CoastDistance
 			&& targetDistance > safeDistance){
 			targetAcceleration = 0; //coasting
-			std::cout << " --> COASTING" << std::endl;
-
 		}
 		else if( targetDistance <= safeDistance
 			&& targetDistance > emergencyBrakeDistance)
@@ -2725,19 +2660,16 @@ double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 			// recalulation of the stopping trajectory (Optimal Control Strategy).
 			{
 				targetAcceleration = vehicleInfo.max_deceleration;
-				std::cout << " --> FOLLOW STOP" << std::endl;
 			}
 			// use following in normal traffic
 			else{
-				targetAcceleration = (-CurrSpeed*CurrSpeed)/(2.0*(targetDistance));
-				std::cout << " --> FOLLOW DCC " << targetAcceleration << std::endl;
+			targetAcceleration = (CurrSpeed*CurrSpeed)/(2.0*(targetDistance));
 			}
 		}
-		else if(targetDistance < emergencyBrakeDistance && CurrSpeed > 2)
+		else if(targetDistance < emergencyBrakeDistance)
 		// Emergency Stop
 		{
 			targetAcceleration = -9.8*4; //stop with -4G
-			std::cout << " -------------> EMERGENCY STOP" << std::endl;
 		}
 		else
 		{
@@ -2747,7 +2679,6 @@ double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 	else
 	{
 		targetAcceleration = vehicleInfo.max_acceleration; 
-		std::cout << " --> MAX ACC" << std::endl;
 	}
 
 	if (targetAcceleration>vehicleInfo.max_acceleration)
@@ -2779,6 +2710,8 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 	WayPoint* 	pGoalCell 		= 0;
 	double 		nCounter 		= 0;
 
+	cout << endl << "Calling BuildPlanningSearchTreeV2" << endl;
+	
 	while(nextLeafToTrace.size()>0)
 	{
 		nCounter++;
@@ -2802,6 +2735,7 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 
 		double distance_to_goal = distance2points(pH->pos, goalPos.pos);
 		double angle_to_goal = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(UtilityHNS::UtilityH::FixNegativeAngle(pH->pos.a), UtilityHNS::UtilityH::FixNegativeAngle(goalPos.pos.a));
+
 		if( distance_to_goal <= 0.1 && angle_to_goal < M_PI_4)
 		{
 			cout << "Goal Found, LaneID: " << pH->laneId <<", Distance : " << distance_to_goal << ", Angle: " << angle_to_goal*RAD2DEG << endl;
@@ -2810,6 +2744,7 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 		}
 		else
 		{
+			
 			if(pH->pLeft && !CheckLaneExits(all_cells_to_delete, pH->pLeft->pLane) && !CheckNodeExits(all_cells_to_delete, pH->pLeft) && bEnableLaneChange && before_change_distance > LANE_CHANGE_MIN_DISTANCE)
 			{
 				wp = new WayPoint();
@@ -3235,8 +3170,8 @@ double PlanningHelpers::GetLanePoints(Lane* l, const WayPoint& prevWayPointIndex
 
 	p2 = p1 = l->points.at(index);
 	p1.pLane = l;
-	p1.distanceCost = prevCost;
-	p2.distanceCost = p1.distanceCost + distance2points(p1.pos, p2.pos);
+	p1.cost = prevCost;
+	p2.cost = p1.cost + distance2points(p1.pos, p2.pos);
 
 	points.push_back(p1);
 
@@ -3245,14 +3180,14 @@ double PlanningHelpers::GetLanePoints(Lane* l, const WayPoint& prevWayPointIndex
 
 		p2 = l->points.at(i);
 		p2.pLane = l;
-		p2.distanceCost = p1.distanceCost + distance2points(p1.pos, p2.pos);
+		p2.cost = p1.cost + distance2points(p1.pos, p2.pos);
 		points.push_back(p2);
 
-		if(p2.distanceCost >= minDistance)
+		if(p2.cost >= minDistance)
 				break;
 		p1 = p2;
 	}
-	return p2.distanceCost;
+	return p2.cost;
 }
 
 WayPoint* PlanningHelpers::GetMinCostCell(const vector<WayPoint*>& cells, const vector<int>& globalPathIds)
@@ -3317,7 +3252,7 @@ void PlanningHelpers::RemoveFromPathUntil(std::vector<WayPoint>& path, const dou
 	int cut_off_index = path.size() - 2;
 	for(unsigned int i = 0; i < path.size() - 2; i++)
 	{
-		if(path.at(i).distanceCost > distance)
+		if(path.at(i).cost > distance)
 		{
 			cut_off_index = i;
 			break;
@@ -3478,6 +3413,8 @@ void PlanningHelpers::TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStar
 		{
 			localPaths.push_back(localPath);
 			TraversePathTreeBackwards(GetMinCostCell(pHead->pBacks, globalPathIds),pStartWP, globalPathIds, localPath, localPaths);
+			// cout << ">> >> TREE Waypoint ID: " 	<< pHead->id << endl;
+			// cout << ">> >> TREE Lane ID: " 		<< pHead->laneId << endl;
 			pHead->bDir = FORWARD_DIR;
 			localPath.push_back(*pHead);
 		}
@@ -3506,7 +3443,10 @@ void PlanningHelpers::TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStar
 //			cout << "Err: PlannerZ -> NULL Back Pointer " << pHead;
 	}
 	else
+	{
+		//cout << "*** calling else pHead != NULL && pHead->id != pStartWP->id ***" << endl;
 		assert(pHead);
+	}	
 }
 
 ACTION_TYPE PlanningHelpers::GetBranchingDirection(WayPoint& currWP, WayPoint& nextWP)
@@ -3590,36 +3530,6 @@ void PlanningHelpers::CalcContourPointsForDetectedObjects(const WayPoint& currPo
 	obj_list = res_list;
 }
 
-double PlanningHelpers::GetCurvatureCostAhead(const std::vector<WayPoint>& path, const RelativeInfo& info,int& prev_index, const double& search_distance)
-{
-	if(path.size()==0) return 0;
-
-	double min_cost = path.at(info.iBack).curvatureCost;
-	double d = info.to_front_distance;
-
-	int local_i = info.iFront;
-	while(local_i < path.size()-1 && d < search_distance)
-	{
-		local_i++;
-		d += hypot(path.at(local_i).pos.y - path.at(local_i-1).pos.y, path.at(local_i).pos.x - path.at(local_i-1).pos.x);
-		if(path.at(local_i).curvatureCost < min_cost)
-		{
-			min_cost = path.at(local_i).curvatureCost;
-		}
-	}
-
-	if(local_i < prev_index && prev_index < path.size())
-	{
-		min_cost = path.at(prev_index).curvatureCost;
-	}
-	else
-	{
-		prev_index = local_i;
-	}
-
-	return min_cost;
-}
-
 double PlanningHelpers::GetVelocityAhead(const std::vector<WayPoint>& path, const RelativeInfo& info, int& prev_index, const double& reasonable_brake_distance)
 {
 	if(path.size()==0) return 0;
@@ -3657,7 +3567,7 @@ void PlanningHelpers::WritePathToFile(const string& fileName, const vector<WayPo
 	 {
 		 ostringstream strwp;
 		 strwp << path.at(i).laneId << "," << path.at(i).id <<","<<path.at(i).pos.x<<","<< path.at(i).pos.y
-				 <<","<< path.at(i).pos.a << "," << path.at(i).curvatureCost << "," << path.at(i).v << ",";
+				 <<","<< path.at(i).pos.a << "," << path.at(i).cost << "," << path.at(i).v << ",";
 		 dataList.push_back(strwp.str());
 	 }
 
@@ -3798,7 +3708,7 @@ void PlanningHelpers::GetCubeAndCenterofTwoPoints(const PlannerHNS::WayPoint& p1
 double PlanningHelpers::GetDistanceFromPoseToEnd(const PlannerHNS::WayPoint& pose, const std::vector<WayPoint>& path)
 {
 	PlannerHNS::RelativeInfo info;
-	PlanningHelpers::GetRelativeInfoDirectionLimited(path, pose, info);
+	PlanningHelpers::GetRelativeInfoLimited(path, pose, info);
 
 	if(info.bAfter)
 		return -info.from_back_distance;
@@ -3827,7 +3737,7 @@ double PlanningHelpers::CalculateLookAheadDistance(const double& steering_delay,
 	
 	//only 25% of the current velocity is added to the minimum pursuit distance, the faster we driver the farther we want to look ahead
 	double total_percentage = steering_delay_percentage + speed_factor;
-	double d = min_distance + (total_percentage * fabs(curr_velocity));
+	double d = min_distance + (total_percentage * fabs(curr_velocity*3.6));
 
 	if(d < min_distance)
 	{
