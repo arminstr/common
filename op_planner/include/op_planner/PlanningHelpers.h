@@ -131,7 +131,7 @@ public:
 
 	static void SmoothGlobalPathSpeed(std::vector<WayPoint>& path);
 
-	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor);
+	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max = 2.0, double a_x_max = 1.5,double jerk = 1.0);
 
 	/**
 	 *
