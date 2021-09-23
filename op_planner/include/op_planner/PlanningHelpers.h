@@ -180,7 +180,7 @@ public:
 	static void TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP, const std::vector<int>& globalPathIds,
 			std::vector<WayPoint>& localPath, std::vector<std::vector<WayPoint> >& localPaths);
 
-	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.25, double delay_factor = 1.0);
+	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.35, double delay_factor = 1.0);
 
 	static void PredictMotionTimeBased(double& x, double &y, double& heading, double steering, double velocity, double wheelbase, double time_elapsed);
 
@@ -276,14 +276,14 @@ class ACCHelper{
 			m_params(m_params){}
 
 	double evaluateTargetAccleration(double distance_to_follow);
-	double limitMaxVelocity(double desiredVel);
+	double limitVelocity(double desiredVel);
 	double applyPushFactors(double target_a);
 	double evaluateDesiredVelocity(double target_a);
 	double slowDownInCurve(double target_a);
 	bool isObjectAhead();
 	double smoothStop(double target_a);
 	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
-
+	double calcControlDistance(double distance_to_stopline,bool isStopLine);
 
 
 };

@@ -2511,7 +2511,7 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 
 void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max , double a_x_max ,double jerk )
 {
-	CalcAngleAndCostAndCurvatureAnd2D(path);
+	CalcAngleAndCurvatureCost(path);
 	SmoothCurvatureProfiles(path, 0.4, 0.3, 0.01);
 	double v = 0;
 	double a_x_lim = a_x_max;
@@ -2620,25 +2620,28 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 {
 	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params);
 	double desiredVel = 0;
-	double target_a = 0;
 	double control_distance = 0;  // distance for a cascaded speed controller
 	double safety_distance = 10; // additional constant safety distance 
 	double max_deceleration = 2.0; // vehicleInfo.max_deceleration
 	double ACCcontrolgain = 0.5;
 	double delta_speed = 0;
+	bool isStopLine = true;
+	static double previousDesiredVel = 0;
 	
+	std::cout << "Stopline distance: " << CurrBehavior.stopLineDistance << std::endl;
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
-		// The current velocity should never be part of the target velocity. To avoid harsh acceleration, the output of the velocity controller must be limited.
-		// double coastingOffset = 1.0;  // [m/s] 
-		// if (CurrSpeed < CurrBehavior.maxVelocity-coastingOffset)
-		// {
-		// 	desiredVel = CurrSpeed+vehicleInfo.max_acceleration*dt;
-		// }else{
-		// 	desiredVel = CurrSpeed+vehicleInfo.max_deceleration*dt;
-		// }
-	  desiredVel = CurrBehavior.maxVelocity;	
+		// reset desired velocity on standstill
+		if (CurrSpeed < 0.1) previousDesiredVel = CurrSpeed;
+		// limit accleration
+		if (CurrSpeed < CurrBehavior.maxVelocity*0.95){ // stop accelerating if 95% of target is reached
+			desiredVel = previousDesiredVel + vehicleInfo.max_acceleration*dt;
+			std::cout << "Reduced max vel: " << desiredVel << ", target is: " << CurrBehavior.maxVelocity << " with acc: " << vehicleInfo.max_acceleration << ", and dt: " << dt << std::endl;
+		} else{
+		  	desiredVel = CurrBehavior.maxVelocity;	
+		}
+		
 	}
 	else if(CurrBehavior.state == STOPPING_STATE || CurrBehavior.state == TRAFFIC_LIGHT_STOP_STATE || CurrBehavior.state == STOP_SIGN_STOP_STATE)
 	{
@@ -2650,60 +2653,53 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 			|| validObjectDistanceToFollow == false)
 		// Stop at the stopline
 		{
-			// target_a = ACC_helper.evaluateTargetAccleration(distance_to_stopline);
-			// target_a = ACC_helper.applyPushFactors(target_a);
-			// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
-			// desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_stopline);
-			control_distance = (CurrSpeed * CurrSpeed)/2/max_deceleration+safety_distance-distance_to_stopline;
+			isStopLine = true;
+			control_distance = ACC_helper.calcControlDistance(distance_to_stopline, isStopLine);
 			desiredVel = -control_distance * ACCcontrolgain; 
 		} 
 		else 
 		// Stopping behind a vehicle in front of us, which is waiting at the stopline (FOLLOW MODE)
 		{
-			delta_speed = CurrSpeed-CurrBehavior.followVelocity;
-			control_distance = (delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration+CurrBehavior.followVelocity*3.6/2.0+safety_distance-CurrBehavior.followDistance ;
+			isStopLine = false;
+			control_distance = ACC_helper.calcControlDistance(distance_to_follow, isStopLine);
 			desiredVel = CurrBehavior.followVelocity - control_distance * ACCcontrolgain;
-		// target_a = ACC_helper.evaluateTargetAccleration(distance_to_follow);
-			// target_a = ACC_helper.applyPushFactors(target_a);
-			// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
-			// desiredVel = ACC_helper.closeGapToStop(desiredVel, distance_to_follow);
 		}
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
 	{
-		target_a = vehicleInfo.max_deceleration;
-		target_a = ACC_helper.applyPushFactors(target_a);
-		desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
+		desiredVel = 0;
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
-		// target_a = ACC_helper.evaluateTargetAccleration(CurrBehavior.followDistance);
-		// target_a = ACC_helper.applyPushFactors(target_a);
-		// target_a = ACC_helper.slowDownInCurve(target_a);
-		// desiredVel = ACC_helper.evaluateDesiredVelocity(target_a);
-		delta_speed = CurrSpeed-CurrBehavior.followVelocity;
-		control_distance = (delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration+CurrBehavior.followVelocity*3.6/2.0+safety_distance-CurrBehavior.followDistance ;
+		isStopLine = false;
+		control_distance = ACC_helper.calcControlDistance(CurrBehavior.followDistance,isStopLine);
 		desiredVel = CurrBehavior.followVelocity - control_distance * ACCcontrolgain;
-		std::cout<< "# # # # # # follow speed " << CurrBehavior.followVelocity << "  follow distance: " << CurrBehavior.followDistance<< " delta speed:" <<delta_speed << "brake distance : " <<(delta_speed>0)*(delta_speed * delta_speed)/2/max_deceleration<<" control distance :" <<control_distance <<   std::endl;
-		
 	}
 	else
 	{
-	 	target_a = vehicleInfo.max_deceleration;
+	 	desiredVel = 0;
 	}
-		
-    if(desiredVel > CurrBehavior.maxVelocity)
-	{
-		desiredVel = CurrBehavior.maxVelocity;
-	}
-	if(desiredVel < 0)
-	{
-		desiredVel = 0;
-	}
-	// ACC_helper.limitMaxVelocity(desiredVel);   // Function is not working???
-	std::cout<< "Current behavior state " << CurrBehavior.state << "  target speed: " << desiredVel  << "  limit speed: " << CurrBehavior.maxVelocity <<  std::endl;
+
+	desiredVel = ACC_helper.limitVelocity(desiredVel);
 	
+	std::cout << "Desired Vel.: " << desiredVel << ", control_distance: " << control_distance << ", followVelocity: " << CurrBehavior.followVelocity << std::endl;
+	std::cout << "Prev DesVel.: " << previousDesiredVel << std::endl;
+
+	previousDesiredVel = desiredVel;
 	return desiredVel;
+}
+
+double ACCHelper::calcControlDistance(double distance_to_stopline, bool isStopLine){
+	double safety_distance = 5; //for following
+	double temp_distance = 0;
+	distance_to_stopline = distance_to_stopline-(vehicleInfo.wheel_base+vehicleInfo.front_length);
+	if (isStopLine){
+		temp_distance = (CurrSpeed * CurrSpeed)/2/vehicleInfo.max_deceleration-distance_to_stopline;
+	} else {
+		double delta_speed = CurrSpeed-CurrBehavior.followVelocity;
+		temp_distance = (delta_speed>0)*(delta_speed * delta_speed)/2/vehicleInfo.max_deceleration+CurrBehavior.followVelocity*3.6/2.0+safety_distance-CurrBehavior.followDistance;
+	}
+	return temp_distance;
 }
 
 double ACCHelper::smoothStop(double target_a){
@@ -2716,10 +2712,14 @@ double ACCHelper::smoothStop(double target_a){
 	return target_a;
 }
 
-double ACCHelper::limitMaxVelocity(double desiredVel){
+double ACCHelper::limitVelocity(double desiredVel){
 	if(desiredVel > CurrBehavior.maxVelocity)
 	{
 		desiredVel = CurrBehavior.maxVelocity;
+	}
+	else if(desiredVel < 0)
+	{
+		desiredVel = 0;
 	}
 	return desiredVel;
 }
@@ -3920,7 +3920,7 @@ double PlanningHelpers::CalculateLookAheadDistance(const double& steering_delay,
 	
 	//only 25% of the current velocity is added to the minimum pursuit distance, the faster we driver the farther we want to look ahead
 	double total_percentage = steering_delay_percentage + speed_factor;
-	double d = min_distance + (total_percentage * fabs(curr_velocity));
+	double d = min_distance + (total_percentage * fabs(3.6*curr_velocity));
 
 	if(d < min_distance)
 	{
