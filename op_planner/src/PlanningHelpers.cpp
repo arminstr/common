@@ -2619,13 +2619,7 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 		const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params)
 {
 	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5);
-	double desiredVel = 0;
-	double control_distance = 0;  // distance for a cascaded speed controller
-	double safety_distance = 10; // additional constant safety distance 
-	double max_deceleration = 2.0; // vehicleInfo.max_deceleration
-	double delta_speed = 0;
-	bool isStopLine = true;
-	
+	double desiredVel, control_distance, isStopLine;	
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
@@ -2684,20 +2678,12 @@ double ACCHelper::calcControlDistance(double stopDistance, bool isStopLine){
 	stopDistance = stopDistance-(vehicleInfo.wheel_base+vehicleInfo.front_length);
 	if (isStopLine){
 		temp_distance = (-CurrSpeed * CurrSpeed)/2/vehicleInfo.max_deceleration-stopDistance;
-		std::cout << "----------> STOPLINE STOP <----------" << temp_distance << std::endl;
 
 	} else {
 		double delta_speed = CurrSpeed-CurrBehavior.followVelocity;
 		temp_distance = (delta_speed>0) // if leading vehicle faster, do nothing
 			*(-delta_speed * delta_speed)/2/vehicleInfo.max_deceleration // calculated brake distance
 			+CurrBehavior.followVelocity*3.6/2.0+safety_distance-stopDistance;
-
-		std::cout << "Target Distance: " << stopDistance << std::endl;
-		std::cout << "(delta_speed>0) " << (delta_speed>0) << std::endl;
-		std::cout << "brake dist " << ((-delta_speed * delta_speed)/2/vehicleInfo.max_deceleration) << std::endl;
-		std::cout << "half tacho " << (CurrBehavior.followVelocity*3.6/2.0) << std::endl;
-		std::cout << "safety dist " << (safety_distance) << std::endl;
-		std::cout << "stopDistance " << (stopDistance) << std::endl;
 	}
 	return temp_distance;
 }
