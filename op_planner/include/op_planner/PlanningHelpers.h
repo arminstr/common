@@ -180,7 +180,7 @@ public:
 	static void TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP, const std::vector<int>& globalPathIds,
 			std::vector<WayPoint>& localPath, std::vector<std::vector<WayPoint> >& localPaths);
 
-	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.35, double delay_factor = 1.0);
+	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.25, double delay_factor = 1.0);
 
 	static void PredictMotionTimeBased(double& x, double &y, double& heading, double steering, double velocity, double wheelbase, double time_elapsed);
 
@@ -260,6 +260,7 @@ class ACCHelper{
 	const PlannerHNS::ControllerParams& ctrlParams;
 	const PlannerHNS::BehaviorState& CurrBehavior;
 	const PlannerHNS::PlanningParams& m_params;
+	const double ACCcontrolgain;
 
 
 	ACCHelper(const double& dt, 
@@ -267,13 +268,15 @@ class ACCHelper{
 		const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
 		const PlannerHNS::ControllerParams& ctrlParams,
 		const PlannerHNS::BehaviorState& CurrBehavior,
-		const PlannerHNS::PlanningParams& m_params): 
+		const PlannerHNS::PlanningParams& m_params,
+		const double ACCcontrolgain): 
 			dt(dt),
 			CurrSpeed(CurrSpeed),
 			vehicleInfo(vehicleInfo),
 			ctrlParams(ctrlParams),
 			CurrBehavior(CurrBehavior),
-			m_params(m_params){}
+			m_params(m_params),
+			ACCcontrolgain(ACCcontrolgain){}
 
 	double evaluateTargetAccleration(double distance_to_follow);
 	double limitVelocity(double desiredVel);
@@ -283,7 +286,9 @@ class ACCHelper{
 	bool isObjectAhead();
 	double smoothStop(double target_a);
 	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
-	double calcControlDistance(double distance_to_stopline,bool isStopLine);
+	double calcControlDistance(double stopDistance,bool isStopLine);
+	double applyACCcontrolGain(double controlDistance,bool isStopLine);
+
 
 
 };
