@@ -347,7 +347,7 @@ void DecisionMaker::InitBehaviorStates()
  	bool bGreenTrafficLight = true;
  	double critical_long_front_distance =  m_params.additionalBrakingDistance + m_params.verticalSafetyDistance;
 
-	double trafficLightDetectionAdditonalRange = 20.0;
+	double trafficLightDetectionAdditonalRange = 50.0;
 	// make sure we detect the traffic light early 
 
   	plain_distanceToClosestStopLine = 
