@@ -52,6 +52,7 @@ TrajectoryCost TrajectoryEvaluator::doOneStep(const std::vector<std::vector<WayP
 		params.rollOutNumber = 0;
 	}
 
+  // calculate vehicle boundary box
 	double critical_lateral_distance =    car_info.width / 2.0 
                                       + params.horizontalSafetyDistancel;
 
@@ -136,15 +137,17 @@ void TrajectoryEvaluator::collectContoursAndTrajectories(const std::vector<Plann
                                                          std::vector<WayPoint>& trajectory_points,
                                                          const bool& b_static_only)
 {
-  WayPoint p;
+  WayPoint p; 
   double d = 0;
   contour_points.clear();
   trajectory_points.clear();
   for (unsigned int i = 0; i < obj_list.size(); i++)
+  // iterate over whole object list
   {
     double w = obj_list.at(i).w / 2.0;
 
     for (unsigned int i_con = 0; i_con < obj_list.at(i).contour.size(); i_con++)
+    // setup contour points for object "i"
     {
       p.pos = obj_list.at(i).contour.at(i_con);
       p.pos.a = obj_list.at(i).center.pos.a;
@@ -162,12 +165,15 @@ void TrajectoryEvaluator::collectContoursAndTrajectories(const std::vector<Plann
 //        continue;
 
     for (unsigned int i_trj = 0; i_trj < obj_list.at(i).predTrajectories.size(); i_trj++)
+    // iterate over all predicted trajectories which belong to the object
     {
       for (unsigned int i_p = 0; i_p < obj_list.at(i).predTrajectories.at(i_trj).size(); i_p++)
+      // iterate over all points of the predicted trajectory
       {
         p = obj_list.at(i).predTrajectories.at(i_trj).at(i_p);
         p.v = obj_list.at(i).center.v;
 
+        // if predicted point is inside the object -> continue
         if(hypot(obj_list.at(i).center.pos.y-p.pos.y, obj_list.at(i).center.pos.x-p.pos.x) < obj_list.at(i).l/2.0)
         {
           continue;
@@ -177,9 +183,12 @@ void TrajectoryEvaluator::collectContoursAndTrajectories(const std::vector<Plann
         p.width = w;
 
         bool b_blocking = false;
+
         for(unsigned int k=0; k < obj_list.size(); k++)
+        // compare all objects against each other
         {
           if(i != k && PlanningHelpers::PointInsidePolygon(obj_list.at(k).contour, p.pos) == 1)
+          // if | not the same object | AND | two objects are colliding trajectory (HELP-WHY)
           {
             b_blocking = true;
             break;
@@ -187,15 +196,19 @@ void TrajectoryEvaluator::collectContoursAndTrajectories(const std::vector<Plann
         }
 
         if(b_blocking == true || PlanningHelpers::PointInsidePolygon(ego_car_border.points, p.pos) == 1)
+        // if | objects are blocking each other | OR | object predicted into ego bounding box
         {
          // std::cout << "Skip Point: (" << i_trj << ", " << i_p << ") " << ", Objects : " << obj_list.size() <<std::endl;
           break;
         }
 
         bool b_found_point = false;
+        // std::cout << "LOOK HERE trajectory_points.size(): " << trajectory_points.size() << std::endl;
         for(unsigned int k=0; k < trajectory_points.size(); k++)
+        // iterate of all trajecotry points (HELP-WHY: this is empty)
         {
           if(hypot(trajectory_points.at(k).pos.y - p.pos.y, trajectory_points.at(k).pos.x - p.pos.x) < 0.25)
+
           {
             if(p.width > trajectory_points.at(k).width)
             {
