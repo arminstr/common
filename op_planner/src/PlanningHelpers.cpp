@@ -2620,10 +2620,15 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 {
 	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5);
 	double desiredVel, control_distance, isStopLine;	
+	static double previousVelocity;
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
-		desiredVel = CurrBehavior.maxVelocity;		
+		if (CurrSpeed < CurrBehavior.maxVelocity){
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
+		} else {
+			desiredVel = CurrBehavior.maxVelocity;
+		}
 	}
 	else if(CurrBehavior.state == STOPPING_STATE || CurrBehavior.state == TRAFFIC_LIGHT_STOP_STATE || CurrBehavior.state == STOP_SIGN_STOP_STATE)
 	{
@@ -2647,13 +2652,19 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
 	{
-		desiredVel = 0;
+		desiredVel = ACC_helper.smoothStop(previousVelocity);
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
 		isStopLine = false;
 		control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.followDistance,isStopLine);
 		desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
+		if (CurrSpeed<desiredVel){
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
+		} else {
+			//NOP
+		}
+
 	}
 	else
 	{
@@ -2661,6 +2672,7 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	}
 
 	desiredVel = ACC_helper.limitVelocity(desiredVel);
+	previousVelocity = desiredVel;
 	
 	return desiredVel;
 }
@@ -2688,14 +2700,22 @@ double ACCHelper::calcControlDistance(double stopDistance, bool isStopLine){
 	return temp_distance;
 }
 
-double ACCHelper::smoothStop(double target_a){
+double ACCHelper::smoothStop(double previousVelocity){
 	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
-	double currentBrakeDistance = (-CurrSpeed*CurrSpeed/(2*vehicleInfo.max_deceleration));
-	if (currentBrakeDistance < 0.5)
-	{
-		target_a = -1.5;
-	}
-	return target_a;
+
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_deceleration/2)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
+
+	return desiredVelocity;
+}
+
+double ACCHelper::smoothAcceleration(double previousVelocity){
+	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
+
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_acceleration)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
+
+	return desiredVelocity;
 }
 
 double ACCHelper::limitVelocity(double desiredVel){

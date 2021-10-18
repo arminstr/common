@@ -386,8 +386,8 @@ BehaviorStateMachine* YieldingStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
-	std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
-	std::cout << "pCParams->getDistanceToNext() = " << pCParams->getDistanceToNext() << std::endl;
+	// std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
+	// std::cout << "pCParams->getDistanceToNext() = " << pCParams->getDistanceToNext() << std::endl;
 
 	// safety margin before releasing fully blocked state (compensate false negatives)
 	if (!pCParams->bFullyBlock || pCParams->getDistanceToNext()>15.0)	bFullyBlock_latch_cnt++;
@@ -511,12 +511,18 @@ BehaviorStateMachine* StopSignStopStateII::GetNextState()
 
 BehaviorStateMachine* StopSignWaitStateII::GetNextState()
 {
+	// wait until stop sign timer is finished
 	if(UtilityHNS::UtilityH::GetTimeDiffNow(m_StateTimer) < decisionMakingTime)
 		return this;
 
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
 	pCParams->prevStopSignID = pCParams->currentStopSignID;
+
+	// if the intersection is blocked -> follow
+	if(m_pParams->enableFollowing
+		&& pCParams->bFullyBlock)
+		return FindBehaviorState(FOLLOW_STATE);
 
 	return FindBehaviorState(FORWARD_STATE);
 }

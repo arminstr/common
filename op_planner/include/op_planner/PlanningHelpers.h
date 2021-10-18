@@ -261,7 +261,7 @@ class ACCHelper{
 	const PlannerHNS::BehaviorState& CurrBehavior;
 	const PlannerHNS::PlanningParams& m_params;
 	const double ACCcontrolgain;
-
+	
 
 	ACCHelper(const double& dt, 
 		const double& CurrSpeed,
@@ -284,7 +284,8 @@ class ACCHelper{
 	double evaluateDesiredVelocity(double target_a);
 	double slowDownInCurve(double target_a);
 	bool isObjectAhead();
-	double smoothStop(double target_a);
+	double smoothStop(double previousVelocity);
+	double smoothAcceleration(double previousVelocity);
 	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
 	double calcControlDistance(double stopDistance,bool isStopLine);
 	double applyACCcontrolGain(double controlDistance,bool isStopLine);

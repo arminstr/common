@@ -21,7 +21,7 @@ enum HeuristicConstrains {EUCLIDEAN, NEIGBORHOOD,DIRECTION };
 class TrajectoryGenParams
 {
 public:
-	int control_frequency = 50;
+	int control_frequency = 10;
 	bool fixed_velocity = false;
 	bool avoid_curbs = false;
 	bool navigate_tight_turns = false;
