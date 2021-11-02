@@ -432,7 +432,11 @@ void ROSHelpers::InitCurbsMarkers(const int& nMarkers, visualization_msgs::Marke
 	}
 }
 
-void ROSHelpers::ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<PlannerHNS::WayPoint> >& paths,visualization_msgs::MarkerArray& path_markers, visualization_msgs::MarkerArray& path_markers_d)
+void ROSHelpers::ConvertPredictedTrqajectoryMarkers(
+	std::vector<std::vector<PlannerHNS::WayPoint> >& paths,
+	visualization_msgs::MarkerArray& path_markers, 
+	visualization_msgs::MarkerArray& path_markers_d,
+	bool isEgoVehicle)
 {
 	path_markers = path_markers_d;
 	int iCount = 0;
@@ -457,36 +461,18 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<Plan
 		double r = 0, g = 0, b = 0;
 		if(bCurrent == true)
 		{
-			g = 1.0;
+			if (isEgoVehicle) r = 1.0;
+			else g = 1.0;
 		}
 		else
 		{
-			r = 1.0;
+			if (isEgoVehicle) g = 1.0;
+			else r = 1.0;
 		}
-//		if(i == 0)
-//		{
-//			r = 1.0;
-//		}
-//		else if(i == 1)
-//		{
-//			b = 1.0;
-//		}
-//		else if(i == 2)
-//		{
-//			r = 1.0;
-//			b = 1.0;
-//		}
-//		else if(i == 3)
-//		{
-//			r = 1.0;
-//		}
-//		else
-//		{
-//			r = 1.0;
-//		}
 
+
+		// ------ line strip marker ------ 
 		visualization_msgs::Marker path_mkr = CreateGenMarker(0,0,0,0,r,g,b,0.1,iCount,"Predicted_Trajectories", visualization_msgs::Marker::LINE_STRIP);
-
 		//visualization_msgs::Marker path_mkr = CreateGenMarker(0,0,0,0,1.0*prop,0.1*prop,0.1*prop,0.1,i,"Predicted_Trajectories", visualization_msgs::Marker::LINE_STRIP);
 
 		for(unsigned int p = 0; p < paths.at(i).size(); p++)
@@ -505,9 +491,19 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<Plan
 
 		iCount++;
 
-		r = 0.9;
-		g = 0.9;
-		b = 0.0;
+
+
+		if (isEgoVehicle){
+			r = 0.0;
+			g = 1.0; 
+			b = 0.0;
+		}else{
+			r = 0.9;
+			g = 0.9; 
+			b = 0.0;
+		}
+
+		// ------ point/cylinder marker ------ 
 		for(unsigned int p = 0; p < paths.at(i).size(); p++)
 		{
 			geometry_msgs::Point point;
@@ -515,7 +511,12 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<Plan
 			point.y = paths.at(i).at(p).pos.y;
 			point.z = paths.at(i).at(p).pos.z + additional_z;
 
-			visualization_msgs::Marker circle_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::CYLINDER);
+			visualization_msgs::Marker circle_mkr;
+			if (paths.at(i).at(p).timeCost == 999)
+				circle_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::CYLINDER);
+			else 
+				circle_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,1,0,0,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::CYLINDER);
+			
 			if(iCount < path_markers.markers.size())
 				path_markers.markers.at(iCount) = circle_mkr;
 			else
@@ -536,7 +537,12 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(std::vector<std::vector<Plan
 			str_out.precision(3);
 			str_out << paths.at(i).at(p).timeCost;
 
-			visualization_msgs::Marker txt_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::TEXT_VIEW_FACING);
+			visualization_msgs::Marker txt_mkr;
+			if (paths.at(i).at(p).timeCost == 999)
+				txt_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::TEXT_VIEW_FACING);
+			else
+				txt_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,1,0,0,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::TEXT_VIEW_FACING);
+
 			txt_mkr.text = str_out.str();
 
 			if(iCount < path_markers.markers.size())

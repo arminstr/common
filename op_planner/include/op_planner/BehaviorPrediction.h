@@ -1447,7 +1447,17 @@ class BehaviorPrediction
 public:
 	BehaviorPrediction();
 	virtual ~BehaviorPrediction();
-	void DoOneStep(const std::vector<DetectedObject>& obj_list, const WayPoint& currPose, const double& minSpeed, const double& maxDeceleration, RoadNetwork& map);
+	void DoOneStep(
+		const std::vector<DetectedObject>& obj_list, 
+		const WayPoint& currPose, 
+		const double& minSpeed, 
+		const double& maxDeceleration, 
+		RoadNetwork& map,
+		const PlannerHNS::CAR_BASIC_INFO& egoCarInfo,
+		const PlannerHNS::VehicleState& vehicleStatus,
+		std::vector<PlannerHNS::WayPoint> &m_localEgoTrajectory);
+
+	
 
 public:
 	std::vector<PassiveDecisionMaker*> m_d_makers;
@@ -1461,6 +1471,7 @@ public:
 
 	std::vector<ObjParticles*> m_temp_list;
 	std::vector<ObjParticles*> m_ParticleInfo;
+	std::vector<ObjParticles*> m_EgoInfo;
 
 	struct timespec m_GenerationTimer;
 	timespec m_ResamplingTimer;
@@ -1483,6 +1494,10 @@ protected:
 	void PredictCurrentTrajectory(RoadNetwork& map, ObjParticles* pCarPart);
 	void ExtractTrajectoriesFromMap(const std::vector<DetectedObject>& obj_list, RoadNetwork& map, std::vector<ObjParticles*>& old_list);
 	void CalculateCollisionTimes(const double& minSpeed);
+	void fillEgoObject(DetectedObject &obj,
+		const PlannerHNS::CAR_BASIC_INFO& egoCarInfo,
+		const PlannerHNS::VehicleState& vehicleStatus,
+		const WayPoint& currPose);
 
 	void ParticleFilterSteps(std::vector<ObjParticles*>& part_info);
 

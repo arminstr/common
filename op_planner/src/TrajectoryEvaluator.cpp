@@ -28,22 +28,16 @@ void TrajectoryEvaluator::SetEvalParams(const EvaluationParams& eval_param)
 }
 
 TrajectoryCost TrajectoryEvaluator::doOneStep(const std::vector<std::vector<WayPoint> >& roll_outs,
-                                              const std::vector<WayPoint>& total_paths, const WayPoint& curr_state,
-                                              const PlanningParams& original_params, const CAR_BASIC_INFO& car_info,
+                                              const std::vector<WayPoint>& total_paths, 
+                                              const WayPoint& curr_state,
+                                              const PlanningParams& original_params, 
+                                              const CAR_BASIC_INFO& car_info,
                                               const VehicleState& vehicle_state,
                                               const std::vector<DetectedObject>& obj_list,
                                               const bool& b_static_only,
                                               const int& prev_curr_index,
-											  const bool& b_keep_curr)
+											                        const bool& b_keep_curr)
 {
-
-//  timespec _t;
-//  UtilityHNS::UtilityH::GetTickCount(_t);
-
-//	if(g_enable_debug == true)
-//	{
-//		std::cout << "Received paths: " <<  roll_outs.size() << ", Points: " << total_paths.size() << std::endl;
-//	}
 
 	PlanningParams params = original_params;
 
@@ -67,6 +61,7 @@ TrajectoryCost TrajectoryEvaluator::doOneStep(const std::vector<std::vector<WayP
                                       + car_info.back_length;
 
 	int curr_index = -1;
+
 	if(prev_curr_index >=0 && prev_curr_index < roll_outs.size())
 		curr_index  = prev_curr_index;
 	else
@@ -81,7 +76,7 @@ TrajectoryCost TrajectoryEvaluator::doOneStep(const std::vector<std::vector<WayP
 
   calculateTransitionCosts(trajectory_costs_, curr_index, params);
 
-
+  // create contours for detected objects in objectlist
   collectContoursAndTrajectories(obj_list, safety_border_, all_contour_points_, all_trajectories_points_, b_static_only);
 
   collision_points_.clear();
@@ -577,10 +572,14 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
                                               std::vector<TrajectoryCost>& trajectory_costs, 
                                               std::vector<WayPoint>& collision_points)
 {
+
+  
+
   int center_index = params.rollOutNumber / 2;
   for(unsigned int i=0; i < roll_outs.size(); i++)
   {
-		for(unsigned int j = 0; j < contour_points.size(); j++) // Mainly for static collision estimation
+    // ------ Mainly for static collision estimation ------ 
+		for(unsigned int j = 0; j < contour_points.size(); j++) 
 		{
 			RelativeInfo info;
 			int prev_index = 0;
@@ -589,7 +588,7 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 			//PlanningHelpers::GetRelativeInfoLimited(roll_outs.at(center_index), contour_points.at(j), info, prev_index);
 			//info.perp_distance = fabs( info.perp_distance - trajectory_costs.at(i).distance_from_center);
 
-			//use each trajectory to calculate specific collision for each tollout trajectory
+			//use each trajectory to calculate specific collision for each rollout trajectory
 			PlanningHelpers::GetRelativeInfoLimited(roll_outs.at(i), contour_points.at(j), info, prev_index);
 
 			double actual_lateral_distance = fabs(info.perp_distance) - 0.05; //add small distance so this never become zero
@@ -600,20 +599,6 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 			{
 				bBefore = false;
 			}
-
-//			prev_index = 0;
-//			int closest_wp_index =  PlanningHelpers::GetClosestNextPointIndexFast(roll_outs.at(i), contour_points.at(j), prev_index);
-//			WayPoint closest_wp = roll_outs.at(i).at(closest_wp_index);
-//
-//			double distance_between_points = hypot(closest_wp.pos.y - info.perp_point.pos.y, closest_wp.pos.x - info.perp_point.pos.x);
-//
-//			if(distance_between_points > 2.0)
-//				std::cout << "###### >>> Tooo Large Distance: " << distance_between_points << ", closest_index: " <<  closest_wp_index << std::endl;
-
-//			std::cout << "Traj: " <<  trajectory_costs.at(i).relative_index << ", LateralD: " << actual_lateral_distance
-//					<< ", CriticD: " << c_lateral_d << ", LongD: " <<  actual_longitudinal_distance
-//					<< ", (" << info.from_back_distance << ", " << roll_outs.at(i).at(info.iBack).cost << ")"
-//					<< ", Before: " << bBefore << std::endl;
 
 			if(actual_lateral_distance < g_lateral_skip_value && !info.bAfter && !bBefore)
 			{
@@ -628,7 +613,7 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 				{
 					trajectory_costs.at(i).lateral_cost += 2.0; // use half meter fixed critical distance as contact cost for all collision points in the range
 					collision_points.push_back(info.perp_point);
-					if(actual_longitudinal_distance < params.minFollowingDistance) // only block when it is closer than the min follow distance
+					if(actual_longitudinal_distance < params.minDistanceToAvoid) // only block when it is closer than the min follow distance
 					{
 						trajectory_costs.at(i).bBlocked = true;
 					}
@@ -646,7 +631,8 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 			}
 		}
 
-		for(unsigned int j = 0; j < trajectory_points.size(); j++) //for predictive collision estimation, using the estimated trajectories for other moving objects
+    // ------ for predictive collision estimation, using the estimated trajectories for other moving objects ------
+		for(unsigned int j = 0; j < trajectory_points.size(); j++) 
 		{
 			RelativeInfo info;
 			int prev_index = 0;
@@ -658,7 +644,13 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 			double a_diff = info.angle_diff;
 			double traj_prob = info.perp_point.collisionCost;
 
-			if(actual_longitudinal_distance > params.pathDensity && actual_longitudinal_distance < params.minFollowingDistance && actual_lateral_distance < g_lateral_skip_value && !info.bAfter && !info.bBefore && t_diff < eval_params_.collision_time_)
+			if(actual_longitudinal_distance > params.pathDensity 
+        // && actual_longitudinal_distance < params.minFollowingDistance 
+        && actual_longitudinal_distance < params.minDistanceToAvoid
+        && actual_lateral_distance < g_lateral_skip_value 
+        && !info.bAfter 
+        && !info.bBefore 
+        && t_diff < eval_params_.collision_time_)
 			{
 				trajectory_costs.at(i).longitudinal_cost  += 1.0/actual_longitudinal_distance;
 

@@ -1649,6 +1649,55 @@ void PlanningHelpers::SmoothPath(vector<GPSPoint>& path, double weight_data,
 	path = smoothPath_out;
 }
 
+// we compare two specific trajectories in order to find possible conflict/collision points
+void PlanningHelpers::PredictDynamicEgoCollision(
+	std::vector<PlannerHNS::WayPoint>& egoPath,
+	std::vector<PlannerHNS::WayPoint>& obstaclePath,
+	const double collisionTimeWindow,
+	const double collisionDistance)
+{
+	
+	if(egoPath.size() == 0 || obstaclePath.size() == 0) return;
+
+
+	// iterate over all future ego poses
+	for(int egoPose=0; egoPose<egoPath.size(); egoPose++){
+		// iterate over all future obstacle poses
+		for (int obstaclePose=0; obstaclePose<obstaclePath.size(); obstaclePose++){
+
+			// check for invalid time steps
+			if (obstaclePath.at(obstaclePose).timeCost == -1){
+				// std::cout << "INVALID TIME COST AT OBSTACLE!" << std::endl;
+				continue;
+			}
+			if (egoPath.at(egoPose).timeCost == -1){
+				// std::cout << "INVALID TIME COST AT EGO!" << std::endl;
+				continue;
+			}
+			// check time overlap for relevance of the obstacle
+			double timeDiff = abs(egoPath.at(egoPose).timeCost - obstaclePath.at(obstaclePose).timeCost);
+			// std::cout << "TimeDiff: "<<timeDiff<<"=abs("<<egoPath.at(egoPose).timeCost<<"-"<<obstaclePath.at(obstaclePose).timeCost<<")"<<std::endl;
+
+			if (timeDiff < collisionTimeWindow) {
+				// egoPath.at(egoPose).timeCost = 999;
+				double distance = hypot(
+					obstaclePath.at(obstaclePose).pos.x - egoPath.at(egoPose).pos.x,
+					obstaclePath.at(obstaclePose).pos.y - egoPath.at(egoPose).pos.y);
+
+				obstaclePath.at(obstaclePose).timeCost = timeDiff;
+				
+				if (distance < collisionDistance){
+					std::cout << "-----------> Possible collision at " << timeDiff << "s with "<< distance << "m" <<std::endl;
+				} 
+			}else {
+				obstaclePath.at(obstaclePose).timeCost = 999;
+				// std::cout << "setting new time cost" << std::endl;
+			} 
+		}
+	}
+	return;
+}
+
 void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHNS::WayPoint>& path, const PlannerHNS::WayPoint& currPose, const double& minVelocity, const double& minDist)
 {
 	if(path.size() == 0) return;
@@ -2509,6 +2558,25 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
+PlannerHNS::GPSPoint PlanningHelpers::rotate_point(float cx,float cy,float angle, PlannerHNS::GPSPoint p)
+{
+  float s = sin(angle);
+  float c = cos(angle);
+
+  // translate point back to origin:
+  p.x -= cx;
+  p.y -= cy;
+
+  // rotate point
+  float xnew = p.x * c - p.y * s;
+  float ynew = p.x * s + p.y * c;
+
+  // translate point back:
+  p.x = xnew + cx;
+  p.y = ynew + cy;
+  return p;
+}
+
 void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max , double a_x_max ,double jerk )
 {
 	CalcAngleAndCurvatureCost(path);
@@ -2652,7 +2720,11 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
 	{
-		desiredVel = ACC_helper.smoothStop(previousVelocity);
+		if (CurrBehavior.followDistance < 5.0){
+			desiredVel = 0;
+		} else{
+			desiredVel = ACC_helper.smoothStop(previousVelocity);
+		}
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{

@@ -12,6 +12,7 @@
 #include "op_utility/DataRW.h"
 #include "tinyxml.h"
 #include "PlannerCommonDef.h"
+#include "geometry_msgs/Point32.h"
 
 namespace PlannerHNS {
 
@@ -245,7 +246,13 @@ public:
 
 	static double fpprunge ( double x );
 
+	static PlannerHNS::GPSPoint rotate_point(float cx,float cy,float angle, PlannerHNS::GPSPoint p);
 
+	static void PredictDynamicEgoCollision(
+		std::vector<PlannerHNS::WayPoint>& egoPath,
+		std::vector<PlannerHNS::WayPoint>& obstaclePath,
+		const double collisionTimeWindow,
+		const double collisionDistance);
 
 };
 

@@ -550,15 +550,17 @@ void DecisionMaker::CheckForCurveZone(const VehicleState& vehicleState, double& 
 	int currIndex = PlannerHNS::PlanningHelpers::GetClosestNextPointIndexFast(m_Path, state);
 	int index_limit = m_Path.size()/2.0 + 1;
 
+	preCalcPrams->bRePlan = true;
+
 	if((currIndex > index_limit
 			|| preCalcPrams->bRePlan
-			|| preCalcPrams->bNewGlobalPath) && !preCalcPrams->bFinalLocalTrajectory && m_iSinceLastReplan > m_params.nReliableCount)
+			|| preCalcPrams->bNewGlobalPath)) //&& !preCalcPrams->bFinalLocalTrajectory && m_iSinceLastReplan > m_params.nReliableCount)
 	{
 		//Debug
-		//std::cout << "New Local Plan !! " << currIndex << ", "<< preCalcPrams->bRePlan << ", " << preCalcPrams->bNewGlobalPath  << ", " <<  m_TotalPath.at(0).size() << ", PrevLocal: " << m_Path.size();
+		// std::cout << "New Local Plan !! " << currIndex << ", "<< preCalcPrams->bRePlan << ", " << preCalcPrams->bNewGlobalPath  << ", " <<  m_TotalPath.at(0).size() << ", PrevLocal: " << m_Path.size();
 		m_Path = m_LanesRollOuts.at(m_iCurrentTotalPathId).at(preCalcPrams->iCurrSafeTrajectory);
 		//Debug
-		//std::cout << ", NewLocal: " << m_Path.size() << std::endl;
+		// std::cout << ", NewLocal: " << m_Path.size() << std::endl;
 		preCalcPrams->bNewGlobalPath = false;
 		preCalcPrams->bRePlan = false;
 		m_iSinceLastReplan = 0;
