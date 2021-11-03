@@ -1151,6 +1151,8 @@ public:
 	bool				bGreenOutsideControl;
 	std::vector<double> stoppingDistances;
 
+	double 				dt; // current cycle time delta t
+
 	double 				distanceToGoal;
 	bool				bInsideIntersection;
 	bool 				bInsideCurveZone;

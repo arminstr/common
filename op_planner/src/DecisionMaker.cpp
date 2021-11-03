@@ -200,13 +200,17 @@ void DecisionMaker::InitBehaviorStates()
  }
 
  void DecisionMaker::CalculateImportantParameterForDecisionMaking(const PlannerHNS::VehicleState& car_state,
-		 const bool& bEmergencyStop, const std::vector<TrafficLight>& detectedLights,
+		 const bool& bEmergencyStop, 
+		 const std::vector<TrafficLight>& detectedLights,
 		 const TrajectoryCost& bestTrajectory,
-		 const BehaviorState beh)
+		 const BehaviorState beh,
+		 const double dt)
  {
 	 if(m_TotalPaths.size() == 0) return;
 
  	PreCalculatedConditions* pValues = m_pCurrentBehaviorState->GetCalcParams();
+
+	pValues->dt = dt;
 
 	if(beh.boundaryType == INTERSECTION_BOUNDARY) {
 		pValues->bInsideIntersection = true;
@@ -813,7 +817,7 @@ void DecisionMaker::CheckForCurveZone(const VehicleState& vehicleState, double& 
 
 	//UpdateCurrentLane(m_params.maxLaneSearchDistance);
 	
-	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh);
+	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh, dt);
 
 	beh = GenerateBehaviorState(vehicleState);
 

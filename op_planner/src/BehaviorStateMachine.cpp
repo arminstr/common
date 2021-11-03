@@ -389,13 +389,13 @@ BehaviorStateMachine* YieldingStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
-	// std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
+	std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
 	// std::cout << "pCParams->getDistanceToNext() = " << pCParams->getDistanceToNext() << std::endl;
 
 	// safety margin before releasing fully blocked state (compensate false negatives)
 	if (!pCParams->bFullyBlock || pCParams->getDistanceToNext()>15.0)	bFullyBlock_latch_cnt++;
 	else bFullyBlock_latch_cnt = 0;
-	if (bFullyBlock_latch_cnt > 10) {
+	if (bFullyBlock_latch_cnt > 2/pCParams->dt) { // "2/pCParams->dt" => 2 second latch
 		bDelayedFullBlockRelease = true;
 		bFullyBlock_latch_cnt = 0;
 	} else bDelayedFullBlockRelease = false;
@@ -416,7 +416,7 @@ BehaviorStateMachine* FollowStateII::GetNextState()
 	// safety margin before releasing fully blocked state (compensate false negatives)
 	if (!pCParams->bFullyBlock)	bFullyBlock_latch_cnt++;
 	else bFullyBlock_latch_cnt = 0;
-	if (bFullyBlock_latch_cnt > 20) {
+	if (bFullyBlock_latch_cnt > 2/pCParams->dt) {	// 2 seconds latch
 		bDelayedFullBlockRelease = true;
 		bFullyBlock_latch_cnt = 0;
 	} else bDelayedFullBlockRelease = false;

@@ -274,7 +274,7 @@ void SimuDecisionMaker::FirstLocalizeMe(const WayPoint& initCarPos)
 
 	//std::cout << "Detected Objects Distance: " << tc.closest_obj_distance << ", N RollOuts: " << m_RollOuts.size() << std::endl;
 
-	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh);
+	CalculateImportantParameterForDecisionMaking(vehicleState, bEmergencyStop, trafficLight, tc, beh, dt);
 
 	beh = GenerateBehaviorState(vehicleState);
 

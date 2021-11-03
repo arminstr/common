@@ -68,9 +68,11 @@ public:
 	void Init(const ControllerParams& ctrlParams, const PlanningParams& params, const CAR_BASIC_INFO& carInfo);
 	void UpdateAvoidanceParams(bool enable_swerve, int roll_out_numbers);
 	void CalculateImportantParameterForDecisionMaking(const VehicleState& car_state,
-			const bool& bEmergencyStop, const std::vector<TrafficLight>& detectedLights,
+			const bool& bEmergencyStop, 
+			const std::vector<TrafficLight>& detectedLights,
 			const TrajectoryCost& bestTrajectory,
-			const BehaviorState beh);
+			const BehaviorState beh,
+			const double dt);
 	void SetNewGlobalPath(const std::vector<std::vector<WayPoint> >& globalPath);
 
 	PlannerHNS::BOUNDARY_TYPE getWayAreaType(RoadNetwork m_Map);
