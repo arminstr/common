@@ -1656,8 +1656,20 @@ void PlanningHelpers::PredictDynamicEgoCollision(
 	const double collisionTimeWindow,
 	const double collisionDistance)
 {
-	
-	if(egoPath.size() == 0 || obstaclePath.size() == 0) return;
+	// create obstacle to save the costs
+	std::vector<PlannerHNS::WayPoint>  tempObstacleCostPath;
+	for (int obstaclePose=0; obstaclePose < obstaclePath.size() ; obstaclePose++){
+		PlannerHNS::WayPoint newWaypoint;
+		tempObstacleCostPath.push_back(newWaypoint);
+		tempObstacleCostPath.at(obstaclePose).timeCost = 999;
+	}
+
+
+
+	if(egoPath.size() == 0 || obstaclePath.size() == 0) {
+		std::cout << "Path empty!" << std::endl;
+		return;
+	}
 
 
 	// iterate over all future ego poses
@@ -1676,7 +1688,6 @@ void PlanningHelpers::PredictDynamicEgoCollision(
 			}
 			// check time overlap for relevance of the obstacle
 			double timeDiff = abs(egoPath.at(egoPose).timeCost - obstaclePath.at(obstaclePose).timeCost);
-			// std::cout << "TimeDiff: "<<timeDiff<<"=abs("<<egoPath.at(egoPose).timeCost<<"-"<<obstaclePath.at(obstaclePose).timeCost<<")"<<std::endl;
 
 			if (timeDiff < collisionTimeWindow) {
 				// egoPath.at(egoPose).timeCost = 999;
@@ -1684,17 +1695,35 @@ void PlanningHelpers::PredictDynamicEgoCollision(
 					obstaclePath.at(obstaclePose).pos.x - egoPath.at(egoPose).pos.x,
 					obstaclePath.at(obstaclePose).pos.y - egoPath.at(egoPose).pos.y);
 
-				obstaclePath.at(obstaclePose).timeCost = timeDiff;
+				// DON'T CHANGE WHAT YOU ARE LOOKING AT SEVERAL ITERATIONS!
+				//obstaclePath.at(obstaclePose).timeCost = timeDiff;
 				
+
+				// check if object is close enough to be considered
 				if (distance < collisionDistance){
-					std::cout << "-----------> Possible collision at " << timeDiff << "s with "<< distance << "m" <<std::endl;
+
+					// check if current cost is smaller than the latest one found
+					if (timeDiff < tempObstacleCostPath.at(obstaclePose).timeCost)
+						tempObstacleCostPath.at(obstaclePose).timeCost = timeDiff;
+
+					// std::cout << "TimeDiff: "<<timeDiff<<"=abs("<<egoPath.at(egoPose).timeCost<<"-"<<obstaclePath.at(obstaclePose).timeCost<<")"<<std::endl;
+					// std::cout << "-> Possible collision at " << timeDiff << "s with "<< distance << "m" <<std::endl;
+					// std::cout << "-> Possible collision at x:" << obstaclePath.at(obstaclePose).pos.x << " y:"<< obstaclePath.at(obstaclePose).pos.x << "m" <<std::endl;
 				} 
-			}else {
-				obstaclePath.at(obstaclePose).timeCost = 999;
-				// std::cout << "setting new time cost" << std::endl;
 			} 
+			// else {
+				// obstaclePath.at(obstaclePose).timeCost = 999;
+				// std::cout << "setting new time cost 999 at Pose " << obstaclePose << std::endl;
+			// } 
+
 		}
 	}
+
+	// save final time costs
+	for (int obstaclePose=0; obstaclePose < tempObstacleCostPath.size() ; obstaclePose++){
+		obstaclePath.at(obstaclePose).timeCost = tempObstacleCostPath.at(obstaclePose).timeCost;
+	}
+
 	return;
 }
 
@@ -1705,7 +1734,12 @@ void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHN
 	for(unsigned int i = 0 ; i < path.size(); i++)
 		path.at(i).timeCost = -1;
 
-	if(currPose.v == 0 || currPose.v < minVelocity) return;
+	// if(currPose.v == 0 || currPose.v < minVelocity) return; // does not work for dynamic collision prediction
+	double currentVelocity;
+	if(currPose.v == 0 || currPose.v < minVelocity)
+		currentVelocity = minVelocity;
+	else
+		currentVelocity = currPose.v;
 
 	RelativeInfo info;
 	PlanningHelpers::GetRelativeInfo(path, currPose, info);
@@ -1719,7 +1753,7 @@ void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHN
 	for(unsigned int i=info.iFront; i<path.size(); i++)
 	{
 		total_distance += hypot(path.at(i).pos.x- path.at(i-1).pos.x,path.at(i).pos.y- path.at(i-1).pos.y);
-		accum_time = total_distance/currPose.v;
+		accum_time = total_distance/currentVelocity;
 		path.at(i).timeCost = accum_time;
 	}
 }

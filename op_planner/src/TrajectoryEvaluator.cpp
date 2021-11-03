@@ -613,7 +613,8 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 				{
 					trajectory_costs.at(i).lateral_cost += 2.0; // use half meter fixed critical distance as contact cost for all collision points in the range
 					collision_points.push_back(info.perp_point);
-					if(actual_longitudinal_distance < params.minDistanceToAvoid) // only block when it is closer than the min follow distance
+					// if(actual_longitudinal_distance < params.minDistanceToAvoid) // newAvoidance
+					if(actual_longitudinal_distance < params.minFollowingDistance) // only block when it is closer than the min follow distance
 					{
 						trajectory_costs.at(i).bBlocked = true;
 					}
@@ -645,8 +646,8 @@ void TrajectoryEvaluator::calculateDistanceCosts(const PlanningParams& params,
 			double traj_prob = info.perp_point.collisionCost;
 
 			if(actual_longitudinal_distance > params.pathDensity 
-        // && actual_longitudinal_distance < params.minFollowingDistance 
-        && actual_longitudinal_distance < params.minDistanceToAvoid
+        && actual_longitudinal_distance < params.minFollowingDistance 
+        // && actual_longitudinal_distance < params.minDistanceToAvoid // new avoidance
         && actual_lateral_distance < g_lateral_skip_value 
         && !info.bAfter 
         && !info.bBefore 

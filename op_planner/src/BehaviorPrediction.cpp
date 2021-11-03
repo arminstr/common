@@ -133,6 +133,7 @@ void BehaviorPrediction::DoOneStep(
 	}
 
 	// get collison/future position times off trajectory points of obstacles
+	m_ParticleInfo.clear();
 	ExtractTrajectoriesFromMap(obj_list, map, m_ParticleInfo);
 
 	CalculateCollisionTimes(minSpeed);
@@ -270,23 +271,30 @@ void BehaviorPrediction::PredictCurrentTrajectory(RoadNetwork& map, ObjParticles
 	PlannerH planner;
 
 	CalPredictionTimeForObject(pCarPart, m_MinPredictionDistance);
-	pCarPart->obj.pClosestWaypoints = MappingHelpers::GetClosestWaypointsListFromMap(pCarPart->obj.center, map, m_LaneDetectionDistance, pCarPart->obj.bDirection);
 
-	if(!(pCarPart->obj.bDirection && pCarPart->obj.bVelocity) && pCarPart->obj.pClosestWaypoints.size()>0)
+	pCarPart->obj.pClosestWaypoints = MappingHelpers::GetClosestWaypointsListFromMap(
+										pCarPart->obj.center, 
+										map, 
+										m_LaneDetectionDistance, 
+										pCarPart->obj.bDirection);
+
+	if(	!(pCarPart->obj.bDirection && pCarPart->obj.bVelocity) 
+		&& pCarPart->obj.pClosestWaypoints.size()>0)
 	{
 		pCarPart->obj.center.pos.a = pCarPart->obj.pClosestWaypoints.at(0)->pos.a;
 	}
 
-	planner.PredictTrajectoriesUsingDP(pCarPart->obj.center, pCarPart->obj.pClosestWaypoints, pCarPart->m_PredictionDistance, pCarPart->obj.predTrajectories, m_bGenerateBranches, pCarPart->obj.bDirection, PREDICTED_PATH_DENSITY);
+	planner.PredictTrajectoriesUsingDP( 
+		pCarPart->obj.center, 
+		pCarPart->obj.pClosestWaypoints, 
+		pCarPart->m_PredictionDistance, 
+		pCarPart->obj.predTrajectories, 
+		m_bGenerateBranches, 
+		pCarPart->obj.bDirection, 
+		PREDICTED_PATH_DENSITY);
 
 	for(unsigned int t = 0; t < pCarPart->obj.predTrajectories.size(); t ++)
 	{
-//		std::ostringstream path_name;
-//		path_name << "/home/hatem/autoware_openplanner_logs/TempPredLog/";
-//		path_name << t ;
-//		path_name << "_";
-//		PlanningHelpers::GenerateRecommendedSpeed(pCarPart->obj.predTrajectories.at(t), 10, 1.0);
-//		PlannerHNS::PlanningHelpers::WritePathToFile(path_name.str(), pCarPart->obj.predTrajectories.at(t));
 		if(pCarPart->obj.predTrajectories.at(t).size() > 0)
 		{
 			pCarPart->obj.predTrajectories.at(t).at(0).collisionCost = 0;
@@ -299,6 +307,7 @@ void BehaviorPrediction::CalculateCollisionTimes(const double& minSpeed)
 	// predict objects
 	for(unsigned int i=0; i < m_ParticleInfo.size(); i++)
 	{
+		// predict all object trajectories
 		for(unsigned int j=0; j < m_ParticleInfo.at(i)->obj.predTrajectories.size(); j++)
 		{
 			PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(
@@ -319,21 +328,36 @@ void BehaviorPrediction::CalculateCollisionTimes(const double& minSpeed)
 	}
 
 	// PredictDynamicEgoCollision	
-	if (m_EgoInfo.size() == 0) return;
-	if (m_EgoInfo.at(0)->obj.predTrajectories.size() == 0) return;
+	if (m_EgoInfo.size() == 0) {
+		// std::cout << "WARNING: EGO overall PREDICTION EMPTY!" << std::endl;
+		return;
+	}
+	if (m_EgoInfo.at(0)->obj.predTrajectories.size() == 0) {
+		// std::cout << "WARNING: EGO Trajectory PREDICTION EMPTY!" << std::endl;
+		return;
+	}
+	if (m_EgoInfo.at(0)->obj.predTrajectories.size() > 1) {
+		// std::cout << "WARNING: EGO Trajectory SIZE SHOULD BE ONE!" << std::endl;
+		return;
+	}
 
 	//iterate over all predicted obstacles
 	for (int ParticleCnt=0; ParticleCnt<m_ParticleInfo.size(); ParticleCnt++){
 		// check if not empty
-		if (!m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.size() == 0) 
+		if (!m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.size() == 0) {
+
 			// iterate over all trajectories of a predicted object
 			for (int trajectoryCnt = 0; trajectoryCnt < m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.size(); trajectoryCnt++){
-					PlannerHNS::PlanningHelpers::PredictDynamicEgoCollision(
-				m_EgoInfo.at(0)->obj.predTrajectories.at(0),
-				m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.at(trajectoryCnt),
-				5.0,
-				10.0);
+				PlannerHNS::PlanningHelpers::PredictDynamicEgoCollision(
+					m_EgoInfo.at(0)->obj.predTrajectories.at(0),
+					m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.at(trajectoryCnt),
+					5.0,
+					10.0);
 			}
+		}
+		else {
+			// std::cout << "WARNING OBJECT HAS NO TRAJECTORIES" << std::endl;
+		}
 
 	}
 	return;
