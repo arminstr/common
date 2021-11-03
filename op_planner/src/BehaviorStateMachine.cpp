@@ -389,7 +389,7 @@ BehaviorStateMachine* YieldingStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
-	std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
+	// std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
 	// std::cout << "pCParams->getDistanceToNext() = " << pCParams->getDistanceToNext() << std::endl;
 
 	// safety margin before releasing fully blocked state (compensate false negatives)
