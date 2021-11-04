@@ -14,7 +14,6 @@ using namespace std;
 
 namespace PlannerHNS
 {
-
 std::vector<std::pair<GPSPoint, GPSPoint> > PlanningHelpers::m_TestingClosestPoint;
 
 PlanningHelpers::PlanningHelpers()
@@ -65,7 +64,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 			infos.push_back(info_item);
 		}
 	}
-
+	
 	if(infos.size() == 0)
 		return false;
 	else if(infos.size() == 1)
@@ -256,13 +255,14 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 }
 
 bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
-{
+{	
 	if(trajectory.size() < 2) return false;
 
 	WayPoint p0, p1;
 
 	if(trajectory.size()==2)
 	{
+		std::cout << std::endl << "GetRelativeInfoLimited( 1 " << std::endl;
 		vector<WayPoint> _trajectory;
 		p0 = trajectory.at(0);
 		p1 = p0;
@@ -399,7 +399,7 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 		info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
 
 		info.angle_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(p1.pos.a, p.pos.a)*RAD2DEG;
-
+		
 		info.bAfter = false;
 		info.bBefore = false;
 
@@ -887,18 +887,24 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 		int skip_factor = 5;
 		if(resolution > skip_factor)
 			resolution = skip_factor;
+		if(resolution < 0.5)
+			resolution = 0.5;
 
 
 		int skip = 1;
 		if(resolution > 0)
 			skip = skip_factor/resolution;
-
 		for(int i=0; i< size; i+=skip)
 		{
-			if(i+skip/2 < size)
+			if(i+skip/2 < size && i+skip/2 >= 0)
+			{
 				d  = (distance2pointsSqr(trajectory[i].pos, p.pos) + distance2pointsSqr(trajectory[i+skip/2].pos, p.pos))/2.0;
+			}	
 			else
+			{
 				d  = distance2pointsSqr(trajectory[i].pos, p.pos);
+			}
+				
 			if(d < minD)
 			{
 				iStart = i-skip;
@@ -907,7 +913,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 				min_index = i;
 			}
 		}
-
 		if((size - skip/2 - 1) > 0)
 			d  = (distance2pointsSqr(trajectory[size-1].pos, p.pos) + distance2pointsSqr(trajectory[size - skip/2 -1 ].pos, p.pos))/2.0;
 		else
@@ -923,7 +928,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 
 		if(iStart < 0) iStart = 0;
 		if(iEnd >= size) iEnd = size -1;
-
 		for(int i=iStart; i< iEnd; i++)
 		{
 			d  = distance2pointsSqr(trajectory[i].pos, p.pos);
@@ -933,7 +937,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 				minD = d;
 			}
 		}
-
 		if(min_index < size-1)
 		{
 			GPSPoint curr, next;
@@ -1276,15 +1279,12 @@ double PlanningHelpers::GetDistanceToClosestStopLineAndCheck(const std::vector<W
 
 	RelativeInfo info;
 	GetRelativeInfo(path, p, info, prevIndex);
-
 	for(unsigned int i=info.iBack; i<path.size(); i++)
 	{
 		if(path.at(i).stopLineID > 0 && path.at(i).pLane)
 		{
-
 			for(unsigned int j = 0; j < path.at(i).pLane->stopLines.size(); j++)
 			{
-
 				if(path.at(i).pLane->stopLines.at(j).id == path.at(i).stopLineID)
 				{
 					stopLineID = path.at(i).stopLineID;
@@ -1739,21 +1739,21 @@ void PlanningHelpers::CalcAngleAndCurvatureCost(vector<WayPoint>& path)
 	if(path.size() < 2) return;
 
 	path[0].pos.a 	= atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x );
-
+	
 	double k = 0;
 	GPSPoint center;
-
+	
 	for(unsigned int j = 1; j < path.size()-1; j++)
 	{
 		k =  CalcCircle(path[j-1].pos,path[j].pos, path[j+1].pos, center);
-		if(k > 150.0 || std::isnan(k))
-			k = 150.0;
+		if(k > 800.0 || std::isnan(k))
+			k = 800.0;  //changed to 800 due to higher target speeds and limited ay
 
 		if(k<1.0)
 			path[j].curvatureCost = 0;
 		else
 			path[j].curvatureCost = 1.0-1.0/k;
-
+			
 		path[j].pos.a 	= atan2(path[j+1].pos.y - path[j].pos.y, path[j+1].pos.x - path[j].pos.x );
 	}
 	unsigned int j = path.size()-1;
@@ -2368,7 +2368,7 @@ void PlanningHelpers::SmoothCurvatureProfiles(vector<WayPoint>& path_in, double 
 	{
 		return;
 	}
-
+	
 	vector<WayPoint> newpath = path_in;
 	double change = tolerance;
 	double xtemp;
@@ -2513,126 +2513,281 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
-void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor)
+void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max , double a_x_max ,double jerk )
 {
 	CalcAngleAndCurvatureCost(path);
 	SmoothCurvatureProfiles(path, 0.4, 0.3, 0.01);
 	double v = 0;
-
+	double a_x_lim = a_x_max;
 	for(unsigned int i = 0 ; i < path.size(); i++)
-	{
-		double k_ratio = path.at(i).curvatureCost*10.0;
+	{			
 
-		double local_max = path.at(i).v;
+		double local_max = path.at(path.size()-i-1).v;
 		if(local_max == 0)
 			local_max = max_speed;
 		else if(local_max > max_speed)
 			local_max = max_speed;
+		double radi = 1000; 
 
-		if(k_ratio >= 9.5)
-			v = local_max;
-		else if(k_ratio <= 8.5)
-			v = 1.0*speedProfileFactor;
-		else
+		
+		if ((i>0) & (i<(path.size()-1) ))
 		{
-			k_ratio = k_ratio - 8.5;
-			v = (local_max - 1.0) * k_ratio + 1.0;
-			v = v*speedProfileFactor;
+			GPSPoint center;
+			radi = CalcCircle(path[path.size()-i-2].pos,path[path.size()-i-1].pos,path[path.size()-i].pos,center);
+			if (radi >1000 || std::isnan(radi))
+			{	
+				radi = 1000;
+			}
+			v = sqrt(radi*a_y_max);
 		}
-
-		if(v > local_max)
-			path.at(i).v = local_max;
 		else
-			path.at(i).v = v;
-
+			v=local_max;
+		
+		// limit acceleration of the speed profile backward calculation.
+		if (i>0)
+		{
+			double time_path_sequence = distance2points(path[path.size()-i].pos,path[path.size()-i-1].pos)/path.at(path.size()-i).v;
+			// limitation of speed at the end of track
+			
+			
+			if (i>1)
+			{
+				if (path.at(path.size()-i+1).v>path.at(path.size()-i).v) 
+				{
+					a_x_lim = 0;
+					//std::cout << "reseten der ax_limited:" << std::endl;
+				}
+				else 
+				{
+					a_x_lim = a_x_lim + time_path_sequence*jerk;
+				}
+				if (a_x_lim > a_x_max)	
+				a_x_lim = a_x_max;
+			}	
+			double v_acc_lim = path.at(path.size()-i).v+time_path_sequence*a_x_lim;
+			if(v > v_acc_lim)
+			v= v_acc_lim;
+		}
+		
+		// limit speed to zero at the end of track.
+		if (i==0) {
+			v=0;
+			// std::cout << "index: " << i << " | v am Ende: " << v << std::endl;
+		}
+		
+		// limitation of the speed at the end of track
+		if (i==1)
+			{
+				v = sqrt(distance2points(path[path.size()-i].pos,path[path.size()-i-1].pos)*2/a_x_max);
+				// std::cout << "index: " << i << " | v: " << path.at(i).v << std::endl;
+			}
+		
+		if(v > local_max)
+			path.at(path.size()-i-1).v = local_max;
+		else
+			path.at(path.size()-i-1).v = v;
+	}
+	// limit longitudinal acceleration. forward calcualtion.
+	for(unsigned int i = 0 ; i < path.size()-1; i++)
+	{
+		double v = path.at(i+1).v;
+		// limit acceleration of the speed profile forward calculation.
+			double time_path_sequence = distance2points(path[i].pos,path[i+1].pos)/path.at(i).v;
+			
+				if (path.at(i+1).v<path.at(i).v) 
+				{
+					a_x_lim = 0;
+					//std::cout << "reseten der ax_limited:" << std::endl;
+				}
+				else 
+				{
+					a_x_lim = a_x_lim + time_path_sequence*jerk;
+				}
+				if (a_x_lim > a_x_max)	
+				a_x_lim = a_x_max;
+			
+			double v_acc_lim = path.at(i).v+time_path_sequence*a_x_lim;
+			//  std::cout << "index: " << path.size()-i-1 <<"  | vacc_lim: " <<v_acc_lim<<"  | v       : " <<v<< "  |  a_x_lim:  "<< a_x_lim<< std::endl;
+			if(v>v_acc_lim)
+				{v= v_acc_lim; }
+		if(v > max_speed)
+			path.at(i+1).v = max_speed;
+		else
+			path.at(i+1).v = v;
 	}
 
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
 double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
-		const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior)
+		const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params)
 {
-	double desiredVel = 0;
+	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5);
+	double desiredVel, control_distance, isStopLine;	
+	static double previousVelocity;
+	const double velocity_control_error_multiplier = 5.0;
+	const double max_speed_difference = vehicleInfo.max_acceleration * dt * velocity_control_error_multiplier; 
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
-		double acceleration_critical = vehicleInfo.max_acceleration * ctrlParams.accelPushRatio;
-
-		if(CurrBehavior.maxVelocity < CurrSpeed)
-		{
-			acceleration_critical = vehicleInfo.max_deceleration * ctrlParams.brakePushRatio;
+		if (CurrSpeed < CurrBehavior.maxVelocity){
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
+		} else {
+			desiredVel = CurrBehavior.maxVelocity;
 		}
-
-		double incr_vel = acceleration_critical * dt;
-
-		if(CurrSpeed < 1.0 && CurrBehavior.maxVelocity > 1.0)
-		{
-			incr_vel += 1.0;
-		}
-
-		desiredVel = incr_vel + CurrSpeed;
-
-		//std::cout << "Forward: max_velocity: " <<  CurrBehavior.maxVelocity << ", currSpeed: " << CurrSpeed << ", desiredVel: " << desiredVel << ", acceleration: " << acceleration_critical << std::endl;
 	}
 	else if(CurrBehavior.state == STOPPING_STATE || CurrBehavior.state == TRAFFIC_LIGHT_STOP_STATE || CurrBehavior.state == STOP_SIGN_STOP_STATE)
 	{
-		double deceleration_critical = vehicleInfo.max_deceleration;
-		double distance_to_stop = CurrBehavior.stopDistance ;
-		if(distance_to_stop != 0)
+		bool validObjectDistanceToFollow = ACC_helper.isObjectAhead();
+
+		if(	CurrBehavior.stopLineDistance <= (CurrBehavior.followDistance) 
+			|| validObjectDistanceToFollow == false)
+		// Stop at the stopline
 		{
-			deceleration_critical = (-CurrSpeed*CurrSpeed)/(2.0*distance_to_stop);
-		}
-
-		deceleration_critical = deceleration_critical * ctrlParams.brakePushRatio;
-
-		desiredVel = (deceleration_critical * dt) + CurrSpeed;
-		if(CurrSpeed < 1.0)
+			isStopLine = true;
+			control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.stopLineDistance, isStopLine);
+			desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
+		} 
+		else 
+		// Stopping behind a vehicle in front of us, which is waiting at the stopline (FOLLOW MODE)
 		{
-			desiredVel = 0;
+			isStopLine = false;
+			control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.followDistance, isStopLine);
+			desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
 		}
-
-		//std::cout << "STOP: stop_distance: " <<  distance_to_stop << ", desiredVel: " << desiredVel << ", Deceleration: " << deceleration_critical << ", dt: " << dt << std::endl;
+	}
+	else if(CurrBehavior.state == YIELDING_STATE )
+	{
+		desiredVel = ACC_helper.smoothStop(previousVelocity);
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
-		double crash_d = CurrBehavior.followDistance;
-		double safe_d = CurrBehavior.stopDistance;
-		double min_follow_distance = ctrlParams.min_safe_follow_distance*2.0 + CurrSpeed;
-		double diff = crash_d - safe_d;
-		double target_a = 0;
-
-		/**
-		 * Following Conditions
-		 */
-		if(diff < ctrlParams.min_safe_follow_distance*2.0)
-		{
-			double brake_distance = crash_d - ctrlParams.min_safe_follow_distance*2.0;
-
-			if(brake_distance > 0)
-			{
-				target_a = (-CurrSpeed*CurrSpeed)/(2.0*brake_distance);
-			}
-			else
-			{
-				target_a = -9.8*4; //stop with -4G
-			}
-		}
-		else if(diff > (ctrlParams.min_safe_follow_distance*2.0 + CurrSpeed))
-		{
-			target_a = vehicleInfo.max_acceleration;
+		isStopLine = false;
+		control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.followDistance,isStopLine);
+		desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
+		if (CurrSpeed<desiredVel){
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
+		} else {
+			//NOP
 		}
 
-		/**
-		 * When in a curve , should driver slower then followed vehicle
-		 */
-		if(CurrSpeed > CurrBehavior.maxVelocity && target_a > vehicleInfo.max_deceleration)
-		{
+	}
+	else
+	{
+	 	desiredVel = 0;
+	}
 
-			target_a = vehicleInfo.max_deceleration;
-		}
+	desiredVel = ACC_helper.limitVelocity(desiredVel);
 
-		/**
+	if(abs(previousVelocity - desiredVel) > max_speed_difference){
+		std::cout << "++ Check control Paremeters. Control difference to HIGH!" << std::endl;
+		std::cout << "max_speed_difference: 		" << max_speed_difference << std::endl;
+		std::cout << "current speed difference: 	" << abs(previousVelocity - desiredVel) << std::endl;
+		// velocity controller error occured
+		previousVelocity = 0.0;
+	}
+	else {
+		previousVelocity = desiredVel;
+	}
+	
+	return desiredVel;
+}
+
+double ACCHelper::applyACCcontrolGain(double controlDistance, bool isStopLine){
+	if (isStopLine)
+		return -controlDistance * ACCcontrolgain;
+	else
+		return CurrBehavior.followVelocity - controlDistance * ACCcontrolgain;
+}
+
+double ACCHelper::calcControlDistance(double stopDistance, bool isStopLine){
+	double safety_distance = 5; //for following
+	double temp_distance = 0;
+	stopDistance = stopDistance-(vehicleInfo.wheel_base+vehicleInfo.front_length);
+	if (isStopLine){
+		temp_distance = (-CurrSpeed * CurrSpeed)/2/vehicleInfo.max_deceleration-stopDistance;
+
+	} else {
+		double delta_speed = CurrSpeed-CurrBehavior.followVelocity;
+		temp_distance = (delta_speed>0) // if leading vehicle faster, do nothing
+			*(-delta_speed * delta_speed)/2/vehicleInfo.max_deceleration // calculated brake distance
+			+CurrBehavior.followVelocity*3.6/2.0+safety_distance-stopDistance;
+	}
+	return temp_distance;
+}
+
+double ACCHelper::smoothStop(double previousVelocity){
+	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
+
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_deceleration/2)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
+
+	return desiredVelocity;
+}
+
+double ACCHelper::smoothAcceleration(double previousVelocity){
+	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
+
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_acceleration)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
+
+	return desiredVelocity;
+}
+
+double ACCHelper::limitVelocity(double desiredVel){
+	if(desiredVel > CurrBehavior.maxVelocity)
+	{
+		desiredVel = CurrBehavior.maxVelocity;
+	}
+	else if(desiredVel < 0)
+	{
+		desiredVel = 0;
+	}
+	return desiredVel;
+}
+
+double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine){
+	double queue_length;
+	if (isStopLine) queue_length = 0.0; //standstill stop distance behind vehicle ahead;
+	else queue_length = 5.0;
+	
+	double gap_closing_acc = 1.0; // m/s²
+	if (stopDistance > vehicleInfo.wheel_base+vehicleInfo.front_length+queue_length
+		&& CurrSpeed < 1.0)
+	{
+		currentDesiredVelocity = CurrSpeed+gap_closing_acc*dt;
+		currentDesiredVelocity = 1.0;
+	}
+	return currentDesiredVelocity;
+}
+
+bool ACCHelper::isObjectAhead(){
+	// if there is no vehicle in the horizon 
+	if (CurrBehavior.followDistance == m_params.horizonDistance) return false;
+	else return true;
+}
+
+double ACCHelper::slowDownInCurve(double target_a){
+	/**
+	 * When in a curve , should driver slower then followed vehicle
+	 */	
+	if(CurrSpeed > CurrBehavior.maxVelocity && target_a > vehicleInfo.max_deceleration)
+	{
+
+		target_a = vehicleInfo.max_deceleration;
+	}
+	return target_a;
+}
+
+double ACCHelper::evaluateDesiredVelocity(double target_a){
+	// the current velocity should never be used to determine a reference speed profile. 
+	if (target_a > vehicleInfo.max_acceleration) target_a = vehicleInfo.max_acceleration;
+	double desiredVel = (target_a * dt) + CurrSpeed;
+	return desiredVel;
+}
+
+double ACCHelper::applyPushFactors(double target_a){
+	/**
 		 * Apply acceleration push factors
 		 */
 		if(target_a > 0)
@@ -2643,27 +2798,78 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 		{
 			target_a = target_a * ctrlParams.brakePushRatio;
 		}
+		return target_a;
+}
 
-		desiredVel = (target_a * dt) + CurrSpeed;
+double ACCHelper::evaluateTargetAccleration(double distance_to_follow){
 
-		if(CurrSpeed < 1.0 && CurrBehavior.maxVelocity > 1.0 && desiredVel > 0)
-		{
-			desiredVel += 1.0;
+	double targetAcceleration = 0;
+	double additional_safety = 5.0;
+	double coastingOffset = CurrSpeed*2;
+	double targetDistance = distance_to_follow-(vehicleInfo.front_length+vehicleInfo.wheel_base+additional_safety);
+	double safeDistance = (CurrSpeed*3.6)/2; 	// this usually should be (CurrSpeed*3.6)/2 but we are using without /2 due 
+											// to offsets compared to real vehicle beahvior 
+	double CoastDistance = safeDistance; 
+	double emergencyBrakeDistance = (CurrSpeed*3.6/10)*(CurrSpeed*3.6/10);
+
+	std::cout << "----> " << targetDistance << std::endl;
+
+	if(targetDistance < safeDistance*2)
+	// If the difference between the brake distance and the vehicle ahead is smaller than twice the safe distance  
+	// for following a vehicle, coasting/braking is triggered.
+	{
+		// Decide COAST or BRAKE
+		std::cout << " -> Speed: " << CurrSpeed << std::endl;
+		if (targetDistance <= safeDistance*2
+			&& targetDistance > CoastDistance){
+			std::cout << " --> Vehicle Ahead detected" << std::endl;
 		}
+		else if(targetDistance <= CoastDistance
+			&& targetDistance > safeDistance){
+			targetAcceleration = 0; //coasting
+			std::cout << " --> COASTING" << std::endl;
 
-		//std::cout << "Follow: safe_d: " <<  safe_d << ", follow_d: " << crash_d << ", diff: " << diff << ", accel-decel: " << target_a << ", desiredVel: " << desiredVel << std::endl;
+		}
+		else if( targetDistance <= safeDistance
+			&& targetDistance > emergencyBrakeDistance)
+		{
+			double currentBrakeDistance = (-CurrSpeed*CurrSpeed/(2*vehicleInfo.max_deceleration));
+			if (currentBrakeDistance < 1.5)
+			// Intentional Stop:
+			// Start intentional stop braking maneuvre if stopping distance is smaller than 3 meter. This stops the 
+			// recalulation of the stopping trajectory (Optimal Control Strategy).
+			{
+				targetAcceleration = vehicleInfo.max_deceleration;
+				std::cout << " --> FOLLOW STOP" << std::endl;
+			}
+			// use following in normal traffic
+			else{
+				targetAcceleration = (-CurrSpeed*CurrSpeed)/(2.0*(targetDistance));
+				std::cout << " --> FOLLOW DCC " << targetAcceleration << std::endl;
+			}
+		}
+		else if(targetDistance < emergencyBrakeDistance && CurrSpeed > 2)
+		// Emergency Stop
+		{
+			targetAcceleration = -9.8*4; //stop with -4G
+			std::cout << " -------------> EMERGENCY STOP" << std::endl;
+		}
+		else
+		{
+			std::cout << "NOT INTENDED -- WARNING-- " << std::endl;
+		}
 	}
 	else
 	{
-		desiredVel = 0;
+		targetAcceleration = vehicleInfo.max_acceleration; 
+		std::cout << " --> MAX ACC" << std::endl;
 	}
 
-	if(desiredVel > CurrBehavior.maxVelocity)
+	if (targetAcceleration>vehicleInfo.max_acceleration)
 	{
-		desiredVel = CurrBehavior.maxVelocity;
+		targetAcceleration = vehicleInfo.max_acceleration;
 	}
-
-	return desiredVel;
+	return targetAcceleration;
 }
 
 WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
@@ -2688,14 +2894,12 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 	WayPoint* 	pGoalCell 		= 0;
 	double 		nCounter 		= 0;
 
-
 	while(nextLeafToTrace.size()>0)
 	{
 		nCounter++;
 
 		unsigned int min_cost_index = 0;
 		double min_cost = DBL_MAX;
-
 		for(unsigned int i=0; i < nextLeafToTrace.size(); i++)
 		{
 			if(nextLeafToTrace.at(i).second->cost < min_cost)
@@ -2721,7 +2925,6 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 		}
 		else
 		{
-
 			if(pH->pLeft && !CheckLaneExits(all_cells_to_delete, pH->pLeft->pLane) && !CheckNodeExits(all_cells_to_delete, pH->pLeft) && bEnableLaneChange && before_change_distance > LANE_CHANGE_MIN_DISTANCE)
 			{
 				wp = new WayPoint();
