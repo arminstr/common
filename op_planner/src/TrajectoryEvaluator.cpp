@@ -87,7 +87,9 @@ TrajectoryCost TrajectoryEvaluator::doOneStep(const std::vector<std::vector<WayP
 
   normalizeCosts(eval_params_, trajectory_costs_);
 
-  TrajectoryCost best_trajectory = findBestTrajectory(params, prev_curr_index, b_keep_curr, trajectory_costs_);
+  static int previousTrajectoryIndex = 0;
+  TrajectoryCost best_trajectory = findBestTrajectory(params, previousTrajectoryIndex, b_keep_curr, trajectory_costs_,curr_state);
+  previousTrajectoryIndex = best_trajectory.index;
 //	cout << "------------------------------------------------------------- " << endl;
 
 //  double dt = UtilityHNS::UtilityH::GetTimeDiffNow(_t);
@@ -418,21 +420,35 @@ void TrajectoryEvaluator::initializeSafetyPolygon(const WayPoint& curr_state, co
   car_border.points.push_back(top_left_car);
 }
 
-TrajectoryCost TrajectoryEvaluator::findBestTrajectory(const PlanningParams& params,
-		const int& prev_curr_index, const bool& b_keep_curr, std::vector<TrajectoryCost> trajectory_costs)
+TrajectoryCost TrajectoryEvaluator::findBestTrajectory(
+    const PlanningParams& params,
+		const int& prev_curr_index, 
+    const bool& b_keep_curr, 
+    std::vector<TrajectoryCost> trajectory_costs,
+    const WayPoint& curr_state)
 {
+
   TrajectoryCost best_trajectory;
   best_trajectory.bBlocked = true;
   best_trajectory.closest_obj_distance = params.horizonDistance;
   best_trajectory.closest_obj_velocity = 0;
   best_trajectory.index = params.rollOutNumber / 2;
   best_trajectory.lane_index = 0;
-//  double all_closest_obj_distance = params.horizonDistance;
-//  double all_closest_obj_velocity = 0;
+  int center_trajectory = params.rollOutNumber / 2;
 
-  //because the default best trajectory is the center one,
-  //I assign distance and velocity from the center to the best, in case all blocked, this will be the best trajectory
-  //I assume that it is blocker by default, for safety reasons
+
+  // don't change the rollout if we are driving
+  if(curr_state.v > 1.0){
+    // always try to select center rollout
+    if (trajectory_costs.at(center_trajectory).closest_obj_distance > params.minDistanceToAvoid){
+      return trajectory_costs.at(center_trajectory);
+    }
+    else{
+      return trajectory_costs.at(prev_curr_index);
+    }
+  }
+
+
 
   if(best_trajectory.index >=0 && best_trajectory.index < trajectory_costs.size())
   {
@@ -454,14 +470,6 @@ TrajectoryCost TrajectoryEvaluator::findBestTrajectory(const PlanningParams& par
     std::cout << "--------------------------------------------------" << std::endl;
   }
 
-//	for (unsigned int ic = 0; ic < trajectory_costs.size(); ic++)
-//	{
-//		if (trajectory_costs.at(ic).closest_obj_distance < all_closest_obj_distance)
-//		{
-//			all_closest_obj_distance = trajectory_costs.at(ic).closest_obj_distance;
-//			all_closest_obj_velocity = trajectory_costs.at(ic).closest_obj_velocity;
-//		}
-//	}
 
   //new approach, in b_keep_curr branch
   //1. remove blocked trajectories, also remove all trajectory in the same side after the blocked trajectory,
@@ -490,12 +498,6 @@ TrajectoryCost TrajectoryEvaluator::findBestTrajectory(const PlanningParams& par
 		  }
 		}
 
-//	  if(trajectory_costs.size() == 0)
-//	  {
-//		  best_trajectory.closest_obj_distance = all_closest_obj_distance;
-//		  best_trajectory.closest_obj_velocity = all_closest_obj_velocity;
-//	  }
-//	  else
 		if(trajectory_costs.size() > 0)
 	  {
 		  double closest_obj_distance = params.horizonDistance;
@@ -545,12 +547,12 @@ TrajectoryCost TrajectoryEvaluator::findBestTrajectory(const PlanningParams& par
 	  //Find Best not blocked rollout
 	  for (unsigned int ic = 0; ic < trajectory_costs.size(); ic++)
 	  {
-		if(!trajectory_costs.at(ic).bBlocked)
-		{
-			//trajectory_costs.at(ic).closest_obj_distance = best_trajectory.closest_obj_distance;
-			best_trajectory = trajectory_costs.at(ic);
-			break;
-		}
+      if(!trajectory_costs.at(ic).bBlocked)
+      {
+        //trajectory_costs.at(ic).closest_obj_distance = best_trajectory.closest_obj_distance;
+        best_trajectory = trajectory_costs.at(ic);
+        break;
+      }
 	  }
   }
 

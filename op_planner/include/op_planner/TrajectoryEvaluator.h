@@ -99,7 +99,13 @@ private:
 
   void calculateDistanceCosts(const PlanningParams& params, const double& c_lateral_d, const std::vector<std::vector<WayPoint> >& roll_outs, const std::vector<WayPoint>& contour_points, const std::vector<WayPoint>& trajectory_points, std::vector<TrajectoryCost>& trajectory_costs, std::vector<WayPoint>& collision_points);
 
-  TrajectoryCost findBestTrajectory(const PlanningParams& params, const int& prev_curr_index, const bool& b_keep_curr, std::vector<TrajectoryCost> trajectory_costs);
+  TrajectoryCost findBestTrajectory(
+      const PlanningParams& params,
+      const int& prev_curr_index, 
+      const bool& b_keep_curr, 
+      std::vector<TrajectoryCost> trajectory_costs,
+      const WayPoint& curr_state);
+
 
 };
 
