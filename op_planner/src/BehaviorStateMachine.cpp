@@ -346,6 +346,7 @@ BehaviorStateMachine* GoalState::GetNextState()
 BehaviorStateMachine* ForwardStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
+
 	if(pCParams->currentGoalID != pCParams->prevGoalID)
 		return FindBehaviorState(GOAL_STATE);
 
@@ -466,6 +467,7 @@ BehaviorStateMachine* SwerveStateII::GetNextState()
 BehaviorStateMachine* InitStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
+
 	if(pCParams->currentGoalID == 1)
 		return FindBehaviorState(FORWARD_STATE);
 	else

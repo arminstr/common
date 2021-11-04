@@ -29,6 +29,7 @@
 
 namespace amathutils
 {
+
 #define G_MPSS 9.80665  // m/s^2
 
 inline double rad2deg(double _angle)

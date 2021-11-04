@@ -255,13 +255,14 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 }
 
 bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
-{
+{	
 	if(trajectory.size() < 2) return false;
 
 	WayPoint p0, p1;
 
 	if(trajectory.size()==2)
 	{
+		std::cout << std::endl << "GetRelativeInfoLimited( 1 " << std::endl;
 		vector<WayPoint> _trajectory;
 		p0 = trajectory.at(0);
 		p1 = p0;
@@ -886,18 +887,24 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 		int skip_factor = 5;
 		if(resolution > skip_factor)
 			resolution = skip_factor;
+		if(resolution < 0.5)
+			resolution = 0.5;
 
 
 		int skip = 1;
 		if(resolution > 0)
 			skip = skip_factor/resolution;
-
 		for(int i=0; i< size; i+=skip)
 		{
-			if(i+skip/2 < size)
+			if(i+skip/2 < size && i+skip/2 >= 0)
+			{
 				d  = (distance2pointsSqr(trajectory[i].pos, p.pos) + distance2pointsSqr(trajectory[i+skip/2].pos, p.pos))/2.0;
+			}	
 			else
+			{
 				d  = distance2pointsSqr(trajectory[i].pos, p.pos);
+			}
+				
 			if(d < minD)
 			{
 				iStart = i-skip;
@@ -906,7 +913,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 				min_index = i;
 			}
 		}
-
 		if((size - skip/2 - 1) > 0)
 			d  = (distance2pointsSqr(trajectory[size-1].pos, p.pos) + distance2pointsSqr(trajectory[size - skip/2 -1 ].pos, p.pos))/2.0;
 		else
@@ -922,7 +928,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 
 		if(iStart < 0) iStart = 0;
 		if(iEnd >= size) iEnd = size -1;
-
 		for(int i=iStart; i< iEnd; i++)
 		{
 			d  = distance2pointsSqr(trajectory[i].pos, p.pos);
@@ -932,7 +937,6 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 				minD = d;
 			}
 		}
-
 		if(min_index < size-1)
 		{
 			GPSPoint curr, next;
@@ -2592,6 +2596,7 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
+
 PlannerHNS::GPSPoint PlanningHelpers::rotate_point(float cx,float cy,float angle, PlannerHNS::GPSPoint p)
 {
   float s = sin(angle);
@@ -2724,6 +2729,7 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	double desiredVel, control_distance, isStopLine;	
 	static double previousVelocity;
 
+
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
 		if (CurrSpeed < CurrBehavior.maxVelocity){
@@ -2777,6 +2783,7 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	 	desiredVel = 0;
 	}
 
+
 	desiredVel = ACC_helper.limitVelocity(desiredVel);
 	previousVelocity = desiredVel;
 	
@@ -2814,6 +2821,7 @@ double ACCHelper::smoothStop(double previousVelocity){
 
 	return desiredVelocity;
 }
+
 
 double ACCHelper::smoothAcceleration(double previousVelocity){
 	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
@@ -2869,6 +2877,7 @@ double ACCHelper::slowDownInCurve(double target_a){
 	return target_a;
 }
 
+
 double ACCHelper::evaluateDesiredVelocity(double target_a){
 	// the current velocity should never be used to determine a reference speed profile. 
 	if (target_a > vehicleInfo.max_acceleration) target_a = vehicleInfo.max_acceleration;
@@ -2876,6 +2885,7 @@ double ACCHelper::evaluateDesiredVelocity(double target_a){
 	return desiredVel;
 }
 
+  
 double ACCHelper::applyPushFactors(double target_a){
 	/**
 		 * Apply acceleration push factors

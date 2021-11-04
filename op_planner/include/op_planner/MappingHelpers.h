@@ -194,6 +194,7 @@ public:
 	static void UpdatePointWithProjection(const PlannerHNS::RoadNetwork& map, PlannerHNS::WayPoint& p);
 
 	static void SplitLane(int lane_id, int point_index, RoadNetwork& map, PlannerHNS::Lane& modified_lane, PlannerHNS::Lane& added_lane);
+
 };
 
 } /* namespace PlannerHNS */
