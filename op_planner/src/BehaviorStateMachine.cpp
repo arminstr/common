@@ -19,7 +19,9 @@ BehaviorStateMachine::BehaviorStateMachine(PlanningParams* pParams, PreCalculate
 	m_currentTrafficLightID	= -1;
 	decisionMakingTime		= 0.0;
 	decisionMakingCount		= 1;
-	m_zero_velocity 		= 0.1;
+	m_zero_velocity 		= 0.3;
+	bFullyBlock_latch_cnt 	= 0;
+	bInsideIntersection 	= false;
 
 	if(!pPreCalcVal)
 		m_pCalculatedValues = new PreCalculatedConditions();
@@ -354,6 +356,10 @@ BehaviorStateMachine* ForwardStateII::GetNextState()
 				&& pCParams->currentTrafficLightID != pCParams->prevTrafficLightID)
 			return FindBehaviorState(TRAFFIC_LIGHT_STOP_STATE);
 
+
+	else if(pCParams->bInsideIntersection && pCParams->bFullyBlock && pCParams->getDistanceToNext()<15)
+		return FindBehaviorState(YIELDING_STATE);
+
 	else if(m_pParams->enableStopSignBehavior
 			&& pCParams->currentStopSignID > 0
 			&& pCParams->currentStopSignID != pCParams->prevStopSignID)
@@ -363,25 +369,65 @@ BehaviorStateMachine* ForwardStateII::GetNextState()
 		return FindBehaviorState(FOLLOW_STATE);
 
 	else if(m_pParams->enableSwerving
-			&& (pCParams->distanceToNext <= m_pParams->minDistanceToAvoid || pCParams->distanceToNext == m_pParams->horizonDistance)
+			&& (pCParams->distanceToNext <= m_pParams->minDistanceToAvoid) //|| pCParams->distanceToNext == m_pParams->horizonDistance)
 			&& !pCParams->bFullyBlock
 			&& (pCParams->iCurrSafeTrajectory != pCParams->iPrevSafeTrajectory || pCParams->iCurrSafeLane != pCParams->iPrevSafeLane))
-		return FindBehaviorState(OBSTACLE_AVOIDANCE_STATE);
-
+		{
+			return FindBehaviorState(OBSTACLE_AVOIDANCE_STATE);
+		}
 	else if(pCParams->bFinalLocalTrajectory
 			&& (pCParams->distanceToGoal - pCParams->minStoppingDistance) < 1.0 )
 		return FindBehaviorState(STOPPING_STATE);
 
 	else
+	{
 		return FindBehaviorState(this->m_Behavior);
+	}
 }
+
+
+BehaviorStateMachine* YieldingStateII::GetNextState()
+{
+	PreCalculatedConditions* pCParams = GetCalcParams();
+
+	// std::cout << "bFullyBlock_latch_cnt = " << bFullyBlock_latch_cnt << std::endl;
+	// std::cout << "pCParams->getDistanceToNext() = " << pCParams->getDistanceToNext() << std::endl;
+
+	// safety margin before releasing fully blocked state (compensate false negatives)
+	if (!pCParams->bFullyBlock || pCParams->getDistanceToNext()>15.0)	bFullyBlock_latch_cnt++;
+	else bFullyBlock_latch_cnt = 0;
+	if (bFullyBlock_latch_cnt > 2/pCParams->dt) { // "2/pCParams->dt" => 2 second latch
+		bDelayedFullBlockRelease = true;
+		bFullyBlock_latch_cnt = 0;
+	} else bDelayedFullBlockRelease = false;
+
+	if(!pCParams->bInsideIntersection || bDelayedFullBlockRelease)
+	// if(!pCParams->bInsideIntersection || !pCParams->bFullyBlock)
+		return FindBehaviorState(FORWARD_STATE);
+
+	else
+		return FindBehaviorState(this->m_Behavior); // return and reset
+}
+
 
 BehaviorStateMachine* FollowStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
+	// safety margin before releasing fully blocked state (compensate false negatives)
+	if (!pCParams->bFullyBlock)	bFullyBlock_latch_cnt++;
+	else bFullyBlock_latch_cnt = 0;
+	if (bFullyBlock_latch_cnt > 2/pCParams->dt) {	// 2 seconds latch
+		bDelayedFullBlockRelease = true;
+		bFullyBlock_latch_cnt = 0;
+	} else bDelayedFullBlockRelease = false;
+
 	if(pCParams->currentGoalID != pCParams->prevGoalID)
 		return FindBehaviorState(GOAL_STATE);
+	
+	else if(pCParams->bInsideIntersection && pCParams->bFullyBlock && pCParams->getDistanceToNext()<15){
+		return FindBehaviorState(YIELDING_STATE);
+	}
 
 	else if(m_pParams->enableTrafficLightBehavior
 				&& pCParams->currentTrafficLightID > 0
@@ -395,12 +441,12 @@ BehaviorStateMachine* FollowStateII::GetNextState()
 		return FindBehaviorState(STOP_SIGN_STOP_STATE);
 
 	else if(m_pParams->enableSwerving
-	                && (pCParams->distanceToNext <= m_pParams->minDistanceToAvoid || pCParams->distanceToNext == m_pParams->horizonDistance)
+	                && (pCParams->distanceToNext <= m_pParams->minDistanceToAvoid) // || pCParams->distanceToNext == m_pParams->horizonDistance)
 			&& !pCParams->bFullyBlock
 			&& pCParams->iCurrSafeTrajectory != pCParams->iPrevSafeTrajectory)
 		return FindBehaviorState(OBSTACLE_AVOIDANCE_STATE);
 
-	else if(!pCParams->bFullyBlock)
+	else if(bDelayedFullBlockRelease)
 		return FindBehaviorState(FORWARD_STATE);
 
 	else
@@ -441,6 +487,9 @@ BehaviorStateMachine* GoalStateII::GetNextState()
 		pCParams->prevGoalID = pCParams->currentGoalID;
 		return FindBehaviorState(FORWARD_STATE);
 	}
+
+	return FindBehaviorState(this->m_Behavior); // return and reset
+
 }
 
 BehaviorStateMachine* MissionAccomplishedStateII::GetNextState()
@@ -452,10 +501,13 @@ BehaviorStateMachine* StopSignStopStateII::GetNextState()
 {
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
+	std::cout << pCParams->getDistanceToStopLine() << std::endl;
+
 	if(pCParams->currentGoalID != pCParams->prevGoalID)
 		return FindBehaviorState(GOAL_STATE);
 
-	else if(pCParams->currentVelocity < m_zero_velocity)
+	else if(pCParams->currentVelocity < m_zero_velocity
+			&& pCParams->getDistanceToStopLine() <= 4)
 		return FindBehaviorState(STOP_SIGN_WAIT_STATE);
 
 	else
@@ -464,12 +516,18 @@ BehaviorStateMachine* StopSignStopStateII::GetNextState()
 
 BehaviorStateMachine* StopSignWaitStateII::GetNextState()
 {
+	// wait until stop sign timer is finished
 	if(UtilityHNS::UtilityH::GetTimeDiffNow(m_StateTimer) < decisionMakingTime)
 		return this;
 
 	PreCalculatedConditions* pCParams = GetCalcParams();
 
 	pCParams->prevStopSignID = pCParams->currentStopSignID;
+
+	// if the intersection is blocked -> follow
+	if(m_pParams->enableFollowing
+		&& pCParams->bFullyBlock)
+		return FindBehaviorState(FOLLOW_STATE);
 
 	return FindBehaviorState(FORWARD_STATE);
 }
@@ -486,9 +544,13 @@ BehaviorStateMachine* TrafficLightStopStateII::GetNextState()
 		return FindBehaviorState(FORWARD_STATE);
 	}
 
-	else if(pCParams->bTrafficIsRed && pCParams->currentVelocity <= m_zero_velocity)
+	
+
+	else if(pCParams->bTrafficIsRed 
+		&& pCParams->currentVelocity <= m_zero_velocity
+		&& pCParams->getDistanceToStopLine() <= 4)
 	{
-		//std::cout << "Velocity Changed Stopping for trafficLight ("  <<pCParams->currentVelocity << ", " << m_zero_velocity << ")" <<  std::endl;
+		std::cout << "Velocity Changed Stopping for trafficLight ("  <<pCParams->currentVelocity << ", " << m_zero_velocity << ")" <<  std::endl;
 		return FindBehaviorState(TRAFFIC_LIGHT_WAIT_STATE);
 	}
 

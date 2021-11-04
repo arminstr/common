@@ -921,6 +921,8 @@ public:
 	bool bNewPlan;
 	int iTrajectory;
 	int iLane;
+	double stopLineDistance; // Distance to closest stopline
+	BOUNDARY_TYPE boundaryType;
 
 
 	BehaviorState()
@@ -935,6 +937,8 @@ public:
 		bNewPlan = false;
 		iTrajectory = -1;
 		iLane = -1;
+		stopLineDistance = 0;
+		boundaryType = NORMAL_ROAD_BOUNDARY;
 	}
 
 };
@@ -1147,12 +1151,17 @@ public:
 	bool				bGreenOutsideControl;
 	std::vector<double> stoppingDistances;
 
+	double 				dt; // current cycle time delta t
+
 	double 				distanceToGoal;
+	bool				bInsideIntersection;
 	bool 				bInsideCurveZone;
 
 
 	double distanceToStop()
 	{
+		// stopping distances are calculated in "CalculateImportantParametersForDecisionMaking". The closest stopping
+		// distance is located in this fuction.
 		if(stoppingDistances.size()==0) return 0;
 		double minS = stoppingDistances.at(0);
 		for(unsigned int i=0; i< stoppingDistances.size(); i++)
@@ -1164,6 +1173,18 @@ public:
 		}
 		return minS;
 	}
+
+	double getDistanceToNext(){
+		// distance to next object on our local select path
+		return distanceToNext;
+	}
+
+	double getDistanceToStopLine()
+	{
+		//distance to next stopline if there is one available
+		if(stoppingDistances.size()==4) return stoppingDistances.at(3);
+	}
+
 
 	PreCalculatedConditions()
 	{

@@ -70,11 +70,13 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	ROS_INFO(">> Load Traffic Lights from OpenDrive file ... ");
 	std::vector<TrafficLight> trafficLights = GetTrafficLightsList(&odr);
 
+
 	ROS_INFO(">> Load Traffic Signs from OpenDrive file ... ");
 	// std::cout << " >> Load Traffic Lights from OpenDrive file ... " << std::endl;
 	std::vector<TrafficSign> trafficSigns = GetTrafficSignsList(&odr);
 
 	ROS_INFO(">> Load Curbs from OpenDrive file ... ");
+
 	// std::cout << " >> Load Curbs from OpenDrive file .. " << std::endl;
 	std::vector<Curb> curbs = GetCurbsList(&odr);
 

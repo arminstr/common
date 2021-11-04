@@ -12,6 +12,7 @@
 #include "op_utility/DataRW.h"
 #include "tinyxml.h"
 #include "PlannerCommonDef.h"
+#include "geometry_msgs/Point32.h"
 
 namespace PlannerHNS {
 
@@ -131,7 +132,7 @@ public:
 
 	static void SmoothGlobalPathSpeed(std::vector<WayPoint>& path);
 
-	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor);
+	static void GenerateRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max = 2.0, double a_x_max = 1.5,double jerk = 1.0);
 
 	/**
 	 *
@@ -143,7 +144,7 @@ public:
 	 * @return
 	 */
 	static double GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
-			const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior);
+			const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params);
 
 	static void ShiftRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& curr_speed, const double& inc_ratio, const double& path_density);
 
@@ -180,7 +181,7 @@ public:
 	static void TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP, const std::vector<int>& globalPathIds,
 			std::vector<WayPoint>& localPath, std::vector<std::vector<WayPoint> >& localPaths);
 
-	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.15, double delay_factor = 1.0);
+	static double CalculateLookAheadDistance(const double& steering_delay, const double& curr_velocity, const double& min_distance, double speed_factor = 0.25, double delay_factor = 1.0);
 
 	static void PredictMotionTimeBased(double& x, double &y, double& heading, double steering, double velocity, double wheelbase, double time_elapsed);
 
@@ -244,6 +245,59 @@ public:
 	static double fprunge ( double x );
 
 	static double fpprunge ( double x );
+
+	static PlannerHNS::GPSPoint rotate_point(float cx,float cy,float angle, PlannerHNS::GPSPoint p);
+
+	static void PredictDynamicEgoCollision(
+		std::vector<PlannerHNS::WayPoint>& egoPath,
+		std::vector<PlannerHNS::WayPoint>& obstaclePath,
+		const double collisionTimeWindow,
+		const double collisionDistance);
+
+};
+
+class ACCHelper{
+
+
+	public:
+
+	const double& dt;
+	const double& CurrSpeed;
+	const PlannerHNS::CAR_BASIC_INFO& vehicleInfo;
+	const PlannerHNS::ControllerParams& ctrlParams;
+	const PlannerHNS::BehaviorState& CurrBehavior;
+	const PlannerHNS::PlanningParams& m_params;
+	const double ACCcontrolgain;
+	
+
+	ACCHelper(const double& dt, 
+		const double& CurrSpeed,
+		const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
+		const PlannerHNS::ControllerParams& ctrlParams,
+		const PlannerHNS::BehaviorState& CurrBehavior,
+		const PlannerHNS::PlanningParams& m_params,
+		const double ACCcontrolgain): 
+			dt(dt),
+			CurrSpeed(CurrSpeed),
+			vehicleInfo(vehicleInfo),
+			ctrlParams(ctrlParams),
+			CurrBehavior(CurrBehavior),
+			m_params(m_params),
+			ACCcontrolgain(ACCcontrolgain){}
+
+	double evaluateTargetAccleration(double distance_to_follow);
+	double limitVelocity(double desiredVel);
+	double applyPushFactors(double target_a);
+	double evaluateDesiredVelocity(double target_a);
+	double slowDownInCurve(double target_a);
+	bool isObjectAhead();
+	double smoothStop(double previousVelocity);
+	double smoothAcceleration(double previousVelocity);
+	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
+	double calcControlDistance(double stopDistance,bool isStopLine);
+	double applyACCcontrolGain(double controlDistance,bool isStopLine);
+
+
 
 };
 

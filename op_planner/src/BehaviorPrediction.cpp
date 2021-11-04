@@ -94,18 +94,115 @@ BehaviorPrediction::~BehaviorPrediction()
 #endif
 }
 
-void BehaviorPrediction::DoOneStep(const std::vector<DetectedObject>& obj_list, const WayPoint& currPose, const double& minSpeed, const double& maxDeceleration, RoadNetwork& map)
+void BehaviorPrediction::DoOneStep(
+	const std::vector<DetectedObject>& obj_list, 
+	const WayPoint& currPose, 
+	const double& minSpeed, 
+	const double& maxDeceleration, 
+	RoadNetwork& map,
+	const PlannerHNS::CAR_BASIC_INFO& egoCarInfo,
+	const PlannerHNS::VehicleState& vehicleStatus,
+	std::vector<PlannerHNS::WayPoint> &localEgoTrajectory)
 {
-//	if(!m_bUseFixedPrediction && maxDeceleration !=0)
-//		m_MaxPredictionDistance = -pow(currPose.v, 2)/(maxDeceleration);
+	bool bGetEgoPredictionFromMap = false;
+	if (bGetEgoPredictionFromMap)
+	{
+		// create ego object
+		DetectedObject obj;
+		fillEgoObject(obj,egoCarInfo,vehicleStatus,currPose);
+		std::vector<DetectedObject> ego_obj_vector;
+		ego_obj_vector.push_back(obj);	
+		
+		// get trajectory from map
+		ExtractTrajectoriesFromMap(ego_obj_vector, map, m_EgoInfo);
+	} else {
+		// use the trajectory from the planner
+		ObjParticles *new_particle;
+		new_particle = new ObjParticles(g_PredParams);
+		m_EgoInfo.clear();
+		m_EgoInfo.push_back(new_particle);
 
+		// create ego object
+		DetectedObject obj;
+		fillEgoObject(obj,egoCarInfo,vehicleStatus,currPose);
+		m_EgoInfo.at(0)->obj = obj;
+
+		// fill trajectory
+		m_EgoInfo.at(0)->obj.predTrajectories.push_back(localEgoTrajectory);
+
+	}
+
+	// get collison/future position times off trajectory points of obstacles
+	m_ParticleInfo.clear();
 	ExtractTrajectoriesFromMap(obj_list, map, m_ParticleInfo);
+
 	CalculateCollisionTimes(minSpeed);
 
 	if(m_bParticleFilter)
 	{
 		ParticleFilterSteps(m_ParticleInfo);
 	}
+}
+
+void BehaviorPrediction::fillEgoObject(DetectedObject &obj, const PlannerHNS::CAR_BASIC_INFO& egoCarInfo,
+	const PlannerHNS::VehicleState& vehicleStatus,const WayPoint& currPose){
+
+	obj.id = 99999;
+	obj.label = "ego";
+	obj.l = egoCarInfo.length;
+	obj.w = egoCarInfo.width;
+	obj.h = egoCarInfo.height;
+
+	obj.center.pos.x = currPose.pos.x;
+	obj.center.pos.y = currPose.pos.y;
+	obj.center.pos.z = currPose.pos.z;
+	obj.center.pos.a = currPose.pos.a;
+	
+	obj.center.v = vehicleStatus.speed;
+	obj.acceleration_raw = 0; // not set (det_obj.velocity.linear.y)
+	obj.acceleration_desc = 0; // not set (det_obj.velocity.linear.z)
+	obj.bVelocity = true;
+	obj.bDirection = true;
+
+	// ToDo: add ego indicator
+	// if(obj.indicator_state == 0)
+	// 	obj.indicator_state = PlannerHNS::INDICATOR_LEFT;
+	// else if(det_obj.indicator_state == 1)
+	// 	obj.indicator_state = PlannerHNS::INDICATOR_RIGHT;
+	// else if(det_obj.indicator_state == 2)
+	// 	obj.indicator_state = PlannerHNS::INDICATOR_BOTH;
+	// else if(det_obj.indicator_state == 3)
+	// 	obj.indicator_state = PlannerHNS::INDICATOR_NONE;
+	// else
+	obj.indicator_state = PlannerHNS::INDICATOR_NONE;
+
+
+
+	// create ego hull/contour
+	PlannerHNS::GPSPoint p;
+	obj.contour.clear();
+	p.x = obj.center.pos.x+(obj.l/2);
+    p.y = obj.center.pos.y+(obj.w/2);
+    p.z = 2;
+    p = PlanningHelpers::rotate_point(obj.center.pos.x,obj.center.pos.y,obj.center.pos.a,p);
+	obj.contour.push_back(p);
+	p.x = obj.center.pos.x+(obj.l/2);
+    p.y = obj.center.pos.y+(-obj.w/2);
+    p.z = 2;
+    p = PlanningHelpers::rotate_point(obj.center.pos.x,obj.center.pos.y,obj.center.pos.a,p);
+	obj.contour.push_back(p);
+	p.x = obj.center.pos.x+(-obj.l/2);
+    p.y = obj.center.pos.y+(-obj.w/2);
+    p.z = 2;
+    p = PlanningHelpers::rotate_point(obj.center.pos.x,obj.center.pos.y,obj.center.pos.a,p);
+	obj.contour.push_back(p);
+	p.x = obj.center.pos.x+(-obj.l/2);
+    p.y = obj.center.pos.y+(obj.w/2);
+    p.z = 2;
+    p = PlanningHelpers::rotate_point(obj.center.pos.x,obj.center.pos.y,obj.center.pos.a,p);
+	obj.contour.push_back(p);
+
+	return;
 }
 
 void BehaviorPrediction::ExtractTrajectoriesFromMap(const std::vector<DetectedObject>& curr_obj_list,RoadNetwork& map, std::vector<ObjParticles*>& old_obj_list)
@@ -174,23 +271,30 @@ void BehaviorPrediction::PredictCurrentTrajectory(RoadNetwork& map, ObjParticles
 	PlannerH planner;
 
 	CalPredictionTimeForObject(pCarPart, m_MinPredictionDistance);
-	pCarPart->obj.pClosestWaypoints = MappingHelpers::GetClosestWaypointsListFromMap(pCarPart->obj.center, map, m_LaneDetectionDistance, pCarPart->obj.bDirection);
 
-	if(!(pCarPart->obj.bDirection && pCarPart->obj.bVelocity) && pCarPart->obj.pClosestWaypoints.size()>0)
+	pCarPart->obj.pClosestWaypoints = MappingHelpers::GetClosestWaypointsListFromMap(
+										pCarPart->obj.center, 
+										map, 
+										m_LaneDetectionDistance, 
+										pCarPart->obj.bDirection);
+
+	if(	!(pCarPart->obj.bDirection && pCarPart->obj.bVelocity) 
+		&& pCarPart->obj.pClosestWaypoints.size()>0)
 	{
 		pCarPart->obj.center.pos.a = pCarPart->obj.pClosestWaypoints.at(0)->pos.a;
 	}
 
-	planner.PredictTrajectoriesUsingDP(pCarPart->obj.center, pCarPart->obj.pClosestWaypoints, pCarPart->m_PredictionDistance, pCarPart->obj.predTrajectories, m_bGenerateBranches, pCarPart->obj.bDirection, PREDICTED_PATH_DENSITY);
+	planner.PredictTrajectoriesUsingDP( 
+		pCarPart->obj.center, 
+		pCarPart->obj.pClosestWaypoints, 
+		pCarPart->m_PredictionDistance, 
+		pCarPart->obj.predTrajectories, 
+		m_bGenerateBranches, 
+		pCarPart->obj.bDirection, 
+		PREDICTED_PATH_DENSITY);
 
 	for(unsigned int t = 0; t < pCarPart->obj.predTrajectories.size(); t ++)
 	{
-//		std::ostringstream path_name;
-//		path_name << "/home/hatem/autoware_openplanner_logs/TempPredLog/";
-//		path_name << t ;
-//		path_name << "_";
-//		PlanningHelpers::GenerateRecommendedSpeed(pCarPart->obj.predTrajectories.at(t), 10, 1.0);
-//		PlannerHNS::PlanningHelpers::WritePathToFile(path_name.str(), pCarPart->obj.predTrajectories.at(t));
 		if(pCarPart->obj.predTrajectories.at(t).size() > 0)
 		{
 			pCarPart->obj.predTrajectories.at(t).at(0).collisionCost = 0;
@@ -200,14 +304,63 @@ void BehaviorPrediction::PredictCurrentTrajectory(RoadNetwork& map, ObjParticles
 
 void BehaviorPrediction::CalculateCollisionTimes(const double& minSpeed)
 {
+	// predict objects
 	for(unsigned int i=0; i < m_ParticleInfo.size(); i++)
 	{
+		// predict all object trajectories
 		for(unsigned int j=0; j < m_ParticleInfo.at(i)->obj.predTrajectories.size(); j++)
 		{
-			PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(m_ParticleInfo.at(i)->obj.predTrajectories.at(j), m_ParticleInfo.at(i)->obj.center, minSpeed, m_ParticleInfo.at(i)->m_PredictionDistance);
-//			PlannerHNS::PlanningHelpers::CalcAngleAndCost(m_PredictedObjects.at(i).predTrajectories.at(j));
+			PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(
+				m_ParticleInfo.at(i)->obj.predTrajectories.at(j), 
+				m_ParticleInfo.at(i)->obj.center, 
+				minSpeed, 
+				m_ParticleInfo.at(i)->m_PredictionDistance);
 		}
 	}
+	// predict ego
+	for(unsigned int j=0; j < m_EgoInfo.at(0)->obj.predTrajectories.size(); j++)
+	{
+		PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(
+			m_EgoInfo.at(0)->obj.predTrajectories.at(j), 
+			m_EgoInfo.at(0)->obj.center, 
+			minSpeed, 
+			m_EgoInfo.at(0)->m_PredictionDistance);
+	}
+
+	// PredictDynamicEgoCollision	
+	if (m_EgoInfo.size() == 0) {
+		// std::cout << "WARNING: EGO overall PREDICTION EMPTY!" << std::endl;
+		return;
+	}
+	if (m_EgoInfo.at(0)->obj.predTrajectories.size() == 0) {
+		// std::cout << "WARNING: EGO Trajectory PREDICTION EMPTY!" << std::endl;
+		return;
+	}
+	if (m_EgoInfo.at(0)->obj.predTrajectories.size() > 1) {
+		// std::cout << "WARNING: EGO Trajectory SIZE SHOULD BE ONE!" << std::endl;
+		return;
+	}
+
+	//iterate over all predicted obstacles
+	for (int ParticleCnt=0; ParticleCnt<m_ParticleInfo.size(); ParticleCnt++){
+		// check if not empty
+		if (!m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.size() == 0) {
+
+			// iterate over all trajectories of a predicted object
+			for (int trajectoryCnt = 0; trajectoryCnt < m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.size(); trajectoryCnt++){
+				PlannerHNS::PlanningHelpers::PredictDynamicEgoCollision(
+					m_EgoInfo.at(0)->obj.predTrajectories.at(0),
+					m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.at(trajectoryCnt),
+					5.0,
+					10.0);
+			}
+		}
+		else {
+			// std::cout << "WARNING OBJECT HAS NO TRAJECTORIES" << std::endl;
+		}
+
+	}
+	return;
 }
 
 void BehaviorPrediction::ParticleFilterSteps(std::vector<ObjParticles*>& part_info)
@@ -298,7 +451,7 @@ void BehaviorPrediction::SamplesFreshParticles(ObjParticles* pParts)
 			if(g_PredParams.bEnableParking)
 				int n_ps_p = TrajectoryTracker::max_particles_number - pParts->m_TrajectoryTracker.at(t)->nAlivePark;
 
-			std::cout << ">>>>> Total Size Before: " <<pParts->m_TrajectoryTracker.at(t)->m_CurrParts.size() << std::endl;
+			// std::cout << ">>>>> Total Size Before: " <<pParts->m_TrajectoryTracker.at(t)->m_CurrParts.size() << std::endl;
 			for(unsigned int i=0; i < TrajectoryTracker::total_particles_number; i++)
 			{
 				Particle p_new = p;
@@ -323,7 +476,7 @@ void BehaviorPrediction::SamplesFreshParticles(ObjParticles* pParts)
 				pParts->m_TrajectoryTracker.at(t)->InsertNewParticle(p_new);
 			}
 
-			std::cout << ">>>>> Total Size After: " <<pParts->m_TrajectoryTracker.at(t)->m_CurrParts.size() << std::endl;
+			// std::cout << ">>>>> Total Size After: " <<pParts->m_TrajectoryTracker.at(t)->m_CurrParts.size() << std::endl;
 			//if(pBestF == nullptr && pBestS == nullptr && pBestY == nullptr && pBestP == nullptr)
 //			{
 //			    Particle p_new = p;

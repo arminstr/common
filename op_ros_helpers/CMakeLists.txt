@@ -40,6 +40,7 @@ catkin_package(
   op_simu
   libwaypoint_follower
   vector_map_msgs
+  autoware_can_msgs
 )
 
 ## set(CMAKE_CXX_FLAGS "-O2 -g -Wall -Wno-unused-result ${CMAKE_CXX_FLAGS}")

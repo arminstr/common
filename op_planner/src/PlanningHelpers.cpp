@@ -1653,6 +1653,84 @@ void PlanningHelpers::SmoothPath(vector<GPSPoint>& path, double weight_data,
 	path = smoothPath_out;
 }
 
+// we compare two specific trajectories in order to find possible conflict/collision points
+void PlanningHelpers::PredictDynamicEgoCollision(
+	std::vector<PlannerHNS::WayPoint>& egoPath,
+	std::vector<PlannerHNS::WayPoint>& obstaclePath,
+	const double collisionTimeWindow,
+	const double collisionDistance)
+{
+	// create obstacle to save the costs
+	std::vector<PlannerHNS::WayPoint>  tempObstacleCostPath;
+	for (int obstaclePose=0; obstaclePose < obstaclePath.size() ; obstaclePose++){
+		PlannerHNS::WayPoint newWaypoint;
+		tempObstacleCostPath.push_back(newWaypoint);
+		tempObstacleCostPath.at(obstaclePose).timeCost = 999;
+	}
+
+
+
+	if(egoPath.size() == 0 || obstaclePath.size() == 0) {
+		std::cout << "Path empty!" << std::endl;
+		return;
+	}
+
+
+	// iterate over all future ego poses
+	for(int egoPose=0; egoPose<egoPath.size(); egoPose++){
+		// iterate over all future obstacle poses
+		for (int obstaclePose=0; obstaclePose<obstaclePath.size(); obstaclePose++){
+
+			// check for invalid time steps
+			if (obstaclePath.at(obstaclePose).timeCost == -1){
+				// std::cout << "INVALID TIME COST AT OBSTACLE!" << std::endl;
+				continue;
+			}
+			if (egoPath.at(egoPose).timeCost == -1){
+				// std::cout << "INVALID TIME COST AT EGO!" << std::endl;
+				continue;
+			}
+			// check time overlap for relevance of the obstacle
+			double timeDiff = abs(egoPath.at(egoPose).timeCost - obstaclePath.at(obstaclePose).timeCost);
+
+			if (timeDiff < collisionTimeWindow) {
+				// egoPath.at(egoPose).timeCost = 999;
+				double distance = hypot(
+					obstaclePath.at(obstaclePose).pos.x - egoPath.at(egoPose).pos.x,
+					obstaclePath.at(obstaclePose).pos.y - egoPath.at(egoPose).pos.y);
+
+				// DON'T CHANGE WHAT YOU ARE LOOKING AT SEVERAL ITERATIONS!
+				//obstaclePath.at(obstaclePose).timeCost = timeDiff;
+				
+
+				// check if object is close enough to be considered
+				if (distance < collisionDistance){
+
+					// check if current cost is smaller than the latest one found
+					if (timeDiff < tempObstacleCostPath.at(obstaclePose).timeCost)
+						tempObstacleCostPath.at(obstaclePose).timeCost = timeDiff;
+
+					// std::cout << "TimeDiff: "<<timeDiff<<"=abs("<<egoPath.at(egoPose).timeCost<<"-"<<obstaclePath.at(obstaclePose).timeCost<<")"<<std::endl;
+					// std::cout << "-> Possible collision at " << timeDiff << "s with "<< distance << "m" <<std::endl;
+					// std::cout << "-> Possible collision at x:" << obstaclePath.at(obstaclePose).pos.x << " y:"<< obstaclePath.at(obstaclePose).pos.x << "m" <<std::endl;
+				} 
+			} 
+			// else {
+				// obstaclePath.at(obstaclePose).timeCost = 999;
+				// std::cout << "setting new time cost 999 at Pose " << obstaclePose << std::endl;
+			// } 
+
+		}
+	}
+
+	// save final time costs
+	for (int obstaclePose=0; obstaclePose < tempObstacleCostPath.size() ; obstaclePose++){
+		obstaclePath.at(obstaclePose).timeCost = tempObstacleCostPath.at(obstaclePose).timeCost;
+	}
+
+	return;
+}
+
 void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHNS::WayPoint>& path, const PlannerHNS::WayPoint& currPose, const double& minVelocity, const double& minDist)
 {
 	if(path.size() == 0) return;
@@ -1660,7 +1738,12 @@ void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHN
 	for(unsigned int i = 0 ; i < path.size(); i++)
 		path.at(i).timeCost = -1;
 
-	if(currPose.v == 0 || currPose.v < minVelocity) return;
+	// if(currPose.v == 0 || currPose.v < minVelocity) return; // does not work for dynamic collision prediction
+	double currentVelocity;
+	if(currPose.v == 0 || currPose.v < minVelocity)
+		currentVelocity = minVelocity;
+	else
+		currentVelocity = currPose.v;
 
 	RelativeInfo info;
 	PlanningHelpers::GetRelativeInfo(path, currPose, info);
@@ -1674,7 +1757,7 @@ void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHN
 	for(unsigned int i=info.iFront; i<path.size(); i++)
 	{
 		total_distance += hypot(path.at(i).pos.x- path.at(i-1).pos.x,path.at(i).pos.y- path.at(i-1).pos.y);
-		accum_time = total_distance/currPose.v;
+		accum_time = total_distance/currentVelocity;
 		path.at(i).timeCost = accum_time;
 	}
 }
@@ -2513,6 +2596,26 @@ void PlanningHelpers::ShiftRecommendedSpeed(std::vector<WayPoint>& path, const d
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
+
+PlannerHNS::GPSPoint PlanningHelpers::rotate_point(float cx,float cy,float angle, PlannerHNS::GPSPoint p)
+{
+  float s = sin(angle);
+  float c = cos(angle);
+
+  // translate point back to origin:
+  p.x -= cx;
+  p.y -= cy;
+
+  // rotate point
+  float xnew = p.x * c - p.y * s;
+  float ynew = p.x * s + p.y * c;
+
+  // translate point back:
+  p.x = xnew + cx;
+  p.y = ynew + cy;
+  return p;
+}
+
 void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const double& max_speed, const double& speedProfileFactor, double a_y_max , double a_x_max ,double jerk )
 {
 	CalcAngleAndCurvatureCost(path);
@@ -2625,8 +2728,7 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5);
 	double desiredVel, control_distance, isStopLine;	
 	static double previousVelocity;
-	const double velocity_control_error_multiplier = 5.0;
-	const double max_speed_difference = vehicleInfo.max_acceleration * dt * velocity_control_error_multiplier; 
+
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
@@ -2658,7 +2760,11 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
 	{
-		desiredVel = ACC_helper.smoothStop(previousVelocity);
+		if (CurrBehavior.followDistance < 5.0){
+			desiredVel = 0;
+		} else{
+			desiredVel = ACC_helper.smoothStop(previousVelocity);
+		}
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
@@ -2677,18 +2783,9 @@ double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double&
 	 	desiredVel = 0;
 	}
 
-	desiredVel = ACC_helper.limitVelocity(desiredVel);
 
-	if(abs(previousVelocity - desiredVel) > max_speed_difference){
-		std::cout << "++ Check control Paremeters. Control difference to HIGH!" << std::endl;
-		std::cout << "max_speed_difference: 		" << max_speed_difference << std::endl;
-		std::cout << "current speed difference: 	" << abs(previousVelocity - desiredVel) << std::endl;
-		// velocity controller error occured
-		previousVelocity = 0.0;
-	}
-	else {
-		previousVelocity = desiredVel;
-	}
+	desiredVel = ACC_helper.limitVelocity(desiredVel);
+	previousVelocity = desiredVel;
 	
 	return desiredVel;
 }
@@ -2724,6 +2821,7 @@ double ACCHelper::smoothStop(double previousVelocity){
 
 	return desiredVelocity;
 }
+
 
 double ACCHelper::smoothAcceleration(double previousVelocity){
 	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
@@ -2779,6 +2877,7 @@ double ACCHelper::slowDownInCurve(double target_a){
 	return target_a;
 }
 
+
 double ACCHelper::evaluateDesiredVelocity(double target_a){
 	// the current velocity should never be used to determine a reference speed profile. 
 	if (target_a > vehicleInfo.max_acceleration) target_a = vehicleInfo.max_acceleration;
@@ -2786,6 +2885,7 @@ double ACCHelper::evaluateDesiredVelocity(double target_a){
 	return desiredVel;
 }
 
+  
 double ACCHelper::applyPushFactors(double target_a){
 	/**
 		 * Apply acceleration push factors
