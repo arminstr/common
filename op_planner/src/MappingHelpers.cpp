@@ -22,8 +22,8 @@ using namespace std;
 namespace PlannerHNS
 {
 
-constexpr int ANGLE_MAX_FOR_DIRECTION_CHECK = 60;
-constexpr double MAX_DISTANCE_TO_START_LANE_DETECTION = 100;
+constexpr int ANGLE_MAX_FOR_DIRECTION_CHECK = 15;
+constexpr double MAX_DISTANCE_TO_START_LANE_DETECTION = 10;
 
 MappingHelpers::MappingHelpers() {
 }
@@ -241,8 +241,7 @@ WayPoint* MappingHelpers::GetClosestWaypointFromMap(const WayPoint& pos, RoadNet
 				{
 					d = hypot(pL->points.at(0).pos.y - pos.pos.y, pL->points.at(0).pos.x - pos.pos.x);
 				}
-
-				if(d < MAX_DISTANCE_TO_START_LANE_DETECTION && d < min_d)
+				if(d < MAX_DISTANCE_TO_START_LANE_DETECTION && d < min_d && hypot(pL->points.at(info.iFront).pos.y - pos.pos.y, pL->points.at(info.iFront).pos.x - pos.pos.x) < MAX_DISTANCE_TO_START_LANE_DETECTION)
 				{
 					pWaypoint = &pL->points.at(info.iFront);
 					min_d = d;
@@ -254,9 +253,6 @@ WayPoint* MappingHelpers::GetClosestWaypointFromMap(const WayPoint& pos, RoadNet
 	return pWaypoint;
 }
 
-// ToDo:
-// #1 The max angle check can cause missed detections if the object has noise! This is either an issue of the preception/tracking or prediction.
-// #2 This function fails to get a closest waypoint at some iterations from the map inside intersections, this causes prediction misses!
 vector<WayPoint*> MappingHelpers::GetClosestWaypointsListFromMap(const WayPoint& pos, RoadNetwork& map, const double& distance, const bool& bDirectionBased)
 {
 	vector<WayPoint*> waypoints_list;
@@ -633,6 +629,7 @@ void MappingHelpers::LinkLanesPointers(PlannerHNS::RoadNetwork& map)
 		{
 			Lane* pL = &map.roadSegments.at(rs).Lanes.at(i);
 			pL->pRoad = &map.roadSegments.at(rs);
+
 			for(unsigned int j = 0 ; j < pL->fromIds.size(); j++)
 			{
 				for(unsigned int l= 0; l < map.roadSegments.at(rs).Lanes.size(); l++)

@@ -70,13 +70,11 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	ROS_INFO(">> Load Traffic Lights from OpenDrive file ... ");
 	std::vector<TrafficLight> trafficLights = GetTrafficLightsList(&odr);
 
-
 	ROS_INFO(">> Load Traffic Signs from OpenDrive file ... ");
 	// std::cout << " >> Load Traffic Lights from OpenDrive file ... " << std::endl;
 	std::vector<TrafficSign> trafficSigns = GetTrafficSignsList(&odr);
 
 	ROS_INFO(">> Load Curbs from OpenDrive file ... ");
-
 	// std::cout << " >> Load Curbs from OpenDrive file .. " << std::endl;
 	std::vector<Curb> curbs = GetCurbsList(&odr);
 
@@ -112,8 +110,8 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	map.boundaries = boundaries;
 
 	// std::cout << " >> Link Boundaries and Waypoints ... " << std::endl;
-	// MappingHelpers::ConnectBoundariesToWayPoints(map);
-	// MappingHelpers::LinkBoundariesToWayPoints(map);
+	MappingHelpers::ConnectBoundariesToWayPoints(map);
+	MappingHelpers::LinkBoundariesToWayPoints(map);
 
 	MappingHelpers::LinkTrafficLightsIntoGroups(map);
 	MappingHelpers::ConnectTrafficLightsAndStopLines(map);
@@ -180,19 +178,8 @@ std::vector<Lane> OpenDriveMapLoader::GetLanesList(const opendrive::OpenDriveDat
 				if(	laneInfoRight.attributes.type == opendrive::LaneType::Driving )
 				{
 					Lane l;
-					l = GetLaneInfo(odr, &road, &laneInfoRight, road.lanes.lane_sections[i].start_position, endPosition);
-					bool id_found = false;
-					for(int lList_i = 0; lList_i < lList.size(); lList_i ++)
-					{
-						if(lList.at(lList_i).id == l.id)
-						{
-							id_found = true;
-							lList.at(lList_i).length += l.length;
-							lList.at(lList_i).points.insert(lList.at(lList_i).points.end(), l.points.begin(), l.points.end());
-						}
-					}
-					if(!id_found)
-						lList.push_back(l);
+					l = GetLaneInfo(odr, &road, i, &laneInfoRight, road.lanes.lane_sections[i].start_position, endPosition);
+					lList.push_back(l);
 				}
 			}
 			for(const opendrive::LaneInfo &laneInfoLeft : road.lanes.lane_sections[i].left)
@@ -200,25 +187,9 @@ std::vector<Lane> OpenDriveMapLoader::GetLanesList(const opendrive::OpenDriveDat
 				if(	laneInfoLeft.attributes.type == opendrive::LaneType::Driving )
 				{
 					Lane l;
-					l = GetLaneInfo(odr, &road, &laneInfoLeft, road.lanes.lane_sections[i].start_position, endPosition);
-					bool id_found = false;
-					for(int lList_i = 0; lList_i < lList.size(); lList_i ++)
-					{
-						if(lList.at(lList_i).id == l.id)
-						{
-							id_found = true;
-							lList.at(lList_i).length += l.length;
-							lList.at(lList_i).points.insert(lList.at(lList_i).points.end(), l.points.begin(), l.points.end());
-							if(endPosition == road.attributes.length)
-								std::reverse(lList.at(lList_i).points.begin(), lList.at(lList_i).points.end());
-						}
-					}
-					if(!id_found)
-					{
-						if(road.lanes.lane_sections.size() == 1)
-							std::reverse(l.points.begin(), l.points.end());
-						lList.push_back(l);
-					}
+					l = GetLaneInfo(odr, &road, i, &laneInfoLeft, road.lanes.lane_sections[i].start_position, endPosition);
+					std::reverse(l.points.begin(), l.points.end());
+					lList.push_back(l);
 				}
 			}
 		}
@@ -244,13 +215,18 @@ std::vector<RoadSegment> OpenDriveMapLoader::GetRoadSegmentsList(const opendrive
 }
 
 Lane OpenDriveMapLoader::GetLaneInfo(	const opendrive::OpenDriveData* odr, 
-										const opendrive::RoadInformation* road, 
+										const opendrive::RoadInformation* road,
+										uint8_t laneSectionId, 
 										const opendrive::LaneInfo* laneInfo, 
 										double startPosition, 
 										double endPosition)
 {
 	Lane ll;
-	ll.id = 10 + road->attributes.id * 10 + laneInfo->attributes.id;
+	OpenDriveMapLoader::openDriveLaneId id;
+	id.roadId = road->attributes.id;
+	id.laneSectionId = laneSectionId;
+	id.laneId = laneInfo->attributes.id;
+	ll.id = openDriveIDsToInt(id);
 	
 	// add all lanes to the same road segment
 	ll.roadId = 0;
@@ -262,7 +238,7 @@ Lane OpenDriveMapLoader::GetLaneInfo(	const opendrive::OpenDriveData* odr,
 	if(road->attributes.speed.size() > 0)
 		ll.speed = road->attributes.speed[0].max;
 	ll.fromIds 	= GetFromIDs(odr, road, laneInfo);
-	ll.toIds 	= GetToIDs(odr, road, laneInfo);
+	ll.toIds 	= GetToIDs(odr, road, laneSectionId, laneInfo);
 
 	// Get Center Lane Data based on OpenDrive Road
 	ll.points = GetLaneData(odr, road, laneInfo, startPosition, endPosition, 0.5);
@@ -283,7 +259,13 @@ std::vector<int> OpenDriveMapLoader::GetFromIDs(const opendrive::OpenDriveData* 
 		{
 			//check right side lanes with contact point end
 			if(road->road_link.predecessor->contact_point == opendrive::ContactPoint::End)
-				fromIds.push_back(10 + road->road_link.predecessor->id * 10 + laneInfo->attributes.id);
+			{
+				OpenDriveMapLoader::openDriveLaneId id;
+				id.roadId = road->road_link.predecessor->id;
+				id.laneSectionId = 0;
+				id.laneId = laneInfo->attributes.id;
+				fromIds.push_back(openDriveIDsToInt(id));
+			}
 		}
 
 		// no need for checking from Junctions since only incoming Roads are linked
@@ -298,10 +280,23 @@ std::vector<int> OpenDriveMapLoader::GetFromIDs(const opendrive::OpenDriveData* 
 		{
 			// check left side lanes with contact point end
 			if(road->road_link.successor->contact_point == opendrive::ContactPoint::End)
-				fromIds.push_back(10 + road->road_link.successor->id * 10 + laneInfo->attributes.id);
+			{
+				OpenDriveMapLoader::openDriveLaneId id;
+				id.roadId = road->road_link.successor->id;
+				id.laneSectionId = 0;
+				id.laneId = laneInfo->attributes.id;
+				fromIds.push_back(openDriveIDsToInt(id));
+			}
+				
 			// check left side lanes with contact point start
 			if(road->road_link.successor->contact_point == opendrive::ContactPoint::Start)
-				fromIds.push_back(10 + road->road_link.successor->id * 10 + laneInfo->attributes.id);
+			{
+				OpenDriveMapLoader::openDriveLaneId id;
+				id.roadId = road->road_link.successor->id;
+				id.laneSectionId = 0;
+				id.laneId = laneInfo->attributes.id;
+				fromIds.push_back(openDriveIDsToInt(id));
+			}
 		}
 
 		// no need for checking from Junctions since only incoming Roads are linked
@@ -311,24 +306,98 @@ std::vector<int> OpenDriveMapLoader::GetFromIDs(const opendrive::OpenDriveData* 
 }
 
 // Get IDs of the Successing Roads
-std::vector<int> OpenDriveMapLoader::GetToIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo)
+std::vector<int> OpenDriveMapLoader::GetToIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, uint8_t laneSectionId, const opendrive::LaneInfo* laneInfo)
 {
 	std::vector<int> toIds;
 
-	//check right side element
-	//check if a successor exists
-	if(road->road_link.successor && laneInfo->attributes.id < 0)
+	//first check if there are other laneSections after the current section
+	bool found_succeeding_lane_section = false;
+	for(const opendrive::RoadInformation &r : odr->roads)
+	{
+		// connect lane sections on the right side
+		if( r.attributes.id == road->attributes.id && laneInfo->attributes.id < 0)
+		{
+			if(road->lanes.lane_sections.size()-1 > laneSectionId)
+			{
+				// there are more sections after this laneSection
+				for (int i = 0; i < road->lanes.lane_sections.size(); i++) {
+					if(i > laneSectionId)
+					{
+						for(const opendrive::LaneInfo &laneInfoRight : road->lanes.lane_sections.at(i).right)
+						{
+							if(	laneInfoRight.attributes.type == opendrive::LaneType::Driving )
+							{
+								found_succeeding_lane_section = true;
+								OpenDriveMapLoader::openDriveLaneId id;
+								id.roadId = road->attributes.id;
+								id.laneSectionId = i;
+								id.laneId = laneInfoRight.attributes.id;
+								toIds.push_back(openDriveIDsToInt(id));
+							}
+						}
+						break;
+					}
+				}
+			}
+			break;	
+		}
+
+		// connect lane sections on the left side
+		if( r.attributes.id == road->attributes.id && laneInfo->attributes.id > 0)
+		{
+			if(laneSectionId > 0)
+			{
+				// there are more sections after this laneSection
+				for (int i = road->lanes.lane_sections.size()-1; i >=0; i--) {
+					if(i < laneSectionId)
+					{
+						for(const opendrive::LaneInfo &laneInfoLeft : road->lanes.lane_sections.at(i).left)
+						{
+							if(	laneInfoLeft.attributes.type == opendrive::LaneType::Driving )
+							{
+								found_succeeding_lane_section = true;
+								OpenDriveMapLoader::openDriveLaneId id;
+								id.roadId = road->attributes.id;
+								id.laneSectionId = i;
+								id.laneId = laneInfoLeft.attributes.id;
+								toIds.push_back(openDriveIDsToInt(id));
+							}
+						}
+						break;
+					}
+				}
+			}
+			break;	
+		}
+	}
+
+	// check right side element
+	// also the laneSectionId has to be the last Sectionf for the successor evalutation
+	// check if a successor exists
+	if(road->road_link.successor && laneInfo->attributes.id < 0 && laneSectionId == road->lanes.lane_sections.size()-1)
 	{
 		//successor type is road
 		if(road->road_link.successor->element_type == opendrive::ElementType::Road)
 		{
-			for (int i = 0; i < road->lanes.lane_sections.size(); i++) {
-				for(const opendrive::LaneInfo &laneInfoRight : road->lanes.lane_sections[i].right)
+			for(const opendrive::LaneInfo &laneInfoRight : road->lanes.lane_sections[laneSectionId].right)
+			{
+				if(laneInfoRight.attributes.id == laneInfo->attributes.id)
 				{
-					if(laneInfoRight.attributes.id == laneInfo->attributes.id)
+
+					OpenDriveMapLoader::openDriveLaneId id;
+					id.roadId = road->road_link.successor->id;
+					id.laneId = laneInfoRight.link->successor_id;
+					id.laneSectionId = 0;
+					if(id.laneId > 0)
 					{
-						toIds.push_back(10 + road->road_link.successor->id * 10 + laneInfoRight.link->successor_id);
+						for(const opendrive::RoadInformation &r : odr->roads)
+						{
+							if( r.attributes.id == id.roadId)
+								id.laneSectionId = r.lanes.lane_sections.size()-1;
+						}
 					}
+					id.laneId = laneInfoRight.link->successor_id;
+					toIds.push_back(openDriveIDsToInt(id));
 				}
 			}
 		}
@@ -349,7 +418,20 @@ std::vector<int> OpenDriveMapLoader::GetToIDs(const opendrive::OpenDriveData* od
 							{
 								if(laneInfo->attributes.id == connection.links.at(i).from)
 								{
-									toIds.push_back(10 + connection.attributes.connecting_road * 10 + connection.links.at(i).to);
+									OpenDriveMapLoader::openDriveLaneId id;
+									id.roadId = connection.attributes.connecting_road;
+									id.laneId = connection.links.at(i).to;
+									id.laneSectionId = 0;
+									if(id.laneId > 0)
+									{
+										for(const opendrive::RoadInformation &r : odr->roads)
+										{
+											if( r.attributes.id == id.roadId)
+												id.laneSectionId = r.lanes.lane_sections.size()-1;
+										}
+									}
+									
+									toIds.push_back(openDriveIDsToInt(id));
 								}
 							}
 						}
@@ -361,19 +443,31 @@ std::vector<int> OpenDriveMapLoader::GetToIDs(const opendrive::OpenDriveData* od
 
 	// check left side element
 	// since left side elements are opposite to the s-coordinate frame we have to look for predecessors not successors
+	// also the laneSectionId has to be zero for the successor evalutation
 	// check if a predecessor exists
-	if(road->road_link.predecessor && laneInfo->attributes.id > 0)
+	if(road->road_link.predecessor && laneInfo->attributes.id > 0 && laneSectionId == 0)
 	{
 		//predecessor type is a road
 		if(road->road_link.predecessor->element_type == opendrive::ElementType::Road)
 		{
-			for (int i = 0; i < road->lanes.lane_sections.size(); i++) {
-				for(const opendrive::LaneInfo &laneInfoLeft : road->lanes.lane_sections[i].left)
+			for(const opendrive::LaneInfo &laneInfoLeft : road->lanes.lane_sections[laneSectionId].left)
+			{
+				if(laneInfoLeft.attributes.id == laneInfo->attributes.id)
 				{
-					if(laneInfoLeft.attributes.id == laneInfo->attributes.id)
+					OpenDriveMapLoader::openDriveLaneId id;
+					id.roadId = road->road_link.predecessor->id;
+					id.laneId = laneInfoLeft.link->predecessor_id;
+					id.laneSectionId = 0;
+					if(id.laneId > 0)
 					{
-						toIds.push_back(10 + road->road_link.predecessor->id * 10 + laneInfoLeft.link->predecessor_id);
+						for(const opendrive::RoadInformation &r : odr->roads)
+						{
+							if( r.attributes.id == id.roadId)
+								id.laneSectionId = r.lanes.lane_sections.size()-1;
+						}
 					}
+					
+					toIds.push_back(openDriveIDsToInt(id));
 				}
 			}
 		}
@@ -394,7 +488,19 @@ std::vector<int> OpenDriveMapLoader::GetToIDs(const opendrive::OpenDriveData* od
 							{
 								if(laneInfo->attributes.id == connection.links.at(i).from)
 								{
-									toIds.push_back(10 + connection.attributes.connecting_road * 10 + connection.links.at(i).to);
+									OpenDriveMapLoader::openDriveLaneId id;
+									id.roadId = connection.attributes.connecting_road;
+									id.laneId = connection.links.at(i).to;
+									id.laneSectionId = 0;
+									if(id.laneId > 0)
+									{
+										for(const opendrive::RoadInformation &r : odr->roads)
+										{
+											if( r.attributes.id == id.roadId)
+												id.laneSectionId = r.lanes.lane_sections.size()-1;
+										}
+									}
+									toIds.push_back(openDriveIDsToInt(id));
 								}
 							}
 						}
@@ -415,7 +521,11 @@ std::vector<WayPoint> OpenDriveMapLoader::GetLaneData(	const opendrive::OpenDriv
 																double factor)
 {
 	std::vector<WayPoint> gps_points;
-	int laneId = 10 + road->attributes.id * 10 + laneInfo->attributes.id;
+	OpenDriveMapLoader::openDriveLaneId id;
+	id.roadId = road->attributes.id;
+	id.laneSectionId = 0;
+	id.laneId = laneInfo->attributes.id;
+	int laneId = openDriveIDsToInt(id);
 
 	std::vector<opendrive::LaneWidth> lW = GetLaneWidths(odr, road, laneInfo, startPosition, factor);
 
@@ -506,18 +616,6 @@ std::vector<WayPoint> OpenDriveMapLoader::GetLaneData(	const opendrive::OpenDriv
 		}
 
 	}
-
-	// mirror points if left side lane
-	// if(laneInfo->attributes.id > 0)
-	// {
-	// 	std::vector<WayPoint> temp;
-	// 	for(int i = 0; i < gps_points.size(); i++)
-	// 	{
-	// 		temp.push_back(gps_points.back());
-	// 		gps_points.pop_back();
-	// 	}
-	// 	return temp;
-	// }
 
 	return gps_points;
 }
@@ -830,9 +928,13 @@ std::vector<StopLine> OpenDriveMapLoader::GetStopLinesList(const opendrive::Open
 					{
 						sideId = -1;
 					}
-
-					sl.id = 10 + road.traffic_signal_references.at(i).id * 10;
-					sl.lightIds.push_back(sl.id = 10 + road.traffic_signal_references.at(i).id * 10);
+					OpenDriveMapLoader::openDriveLaneId id;
+					id.roadId = road.traffic_signal_references.at(i).id;
+					id.laneSectionId = 0;
+					id.laneId = 0;
+					int tl_id = openDriveIDsToInt(id);
+					sl.id = tl_id;
+					sl.lightIds.push_back(sl.id);
 
 					// flip the s_pos starting point since the geometry was defined in the other direction
 					if(sideId * t_pos < 0)
@@ -930,7 +1032,11 @@ std::vector<StopLine> OpenDriveMapLoader::GetStopLinesList(const opendrive::Open
 					}
 
 					if(laneId !=0){
-						sl.laneId = 10 + road.attributes.id * 10 + laneId;
+						OpenDriveMapLoader::openDriveLaneId id;
+						id.roadId = road.attributes.id;
+						id.laneSectionId = 0;
+						id.laneId = laneId;
+						sl.laneId = openDriveIDsToInt(id);
 					}else{
 						ROS_FATAL(">> Did not get a lane Id continuing loop! ");
 						continue;
@@ -967,7 +1073,12 @@ std::vector<TrafficLight> OpenDriveMapLoader::GetTrafficLightsList(const opendri
 					double s_pos = road.traffic_signals.at(i).start_position;
 					double t_pos = road.traffic_signals.at(i).track_position;
 
-					tl.id = 10 + road.traffic_signals.at(i).id*10;
+					OpenDriveMapLoader::openDriveLaneId id;
+					id.roadId = road.traffic_signals.at(i).id;
+					id.laneSectionId = 0;
+					id.laneId = 0;
+
+					tl.id = openDriveIDsToInt(id);
 
 					// iterate trough roads to identify signal references
 					for(const opendrive::RoadInformation &road : odr->roads)
@@ -976,7 +1087,11 @@ std::vector<TrafficLight> OpenDriveMapLoader::GetTrafficLightsList(const opendri
 						{
 							for(int i = 0; i < road.traffic_signal_references.size(); i++)
 							{	
-								if(tl.id == (10 + road.traffic_signal_references.at(i).id * 10))
+								OpenDriveMapLoader::openDriveLaneId ref_id;
+								ref_id.roadId = road.traffic_signal_references.at(i).id;
+								ref_id.laneSectionId = 0;
+								ref_id.laneId = 0;
+								if(tl.id == openDriveIDsToInt(ref_id))
 								{
 									// get the current road's lane id
 									int laneId = 0;
@@ -1006,8 +1121,12 @@ std::vector<TrafficLight> OpenDriveMapLoader::GetTrafficLightsList(const opendri
 									}
 
 									if(laneId != 0)
-									{										
-										tl.laneIds.push_back(10 + road.attributes.id * 10 + laneId);
+									{	
+										OpenDriveMapLoader::openDriveLaneId l_id;
+										l_id.roadId = road.attributes.id;
+										l_id.laneSectionId = 0;
+										l_id.laneId = laneId;
+										tl.laneIds.push_back(openDriveIDsToInt(l_id));
 										tl.stopLineID = tl.id;
 
 										if(tl.laneIds.size() > 0 && tl.stopLineID != 0)
@@ -1185,7 +1304,12 @@ std::vector<TrafficSign> OpenDriveMapLoader::GetTrafficSignsList(const opendrive
 					double s_pos = road.traffic_signals.at(i).start_position;
 					double t_pos = road.traffic_signals.at(i).track_position;
 
-					tl.id = 10 + road.traffic_signals.at(i).id*10;
+					OpenDriveMapLoader::openDriveLaneId id;
+					id.roadId = road.traffic_signals.at(i).id;
+					id.laneSectionId = 0;
+					id.laneId = 0;
+
+					tl.id = openDriveIDsToInt(id);
 
 					// iterate trough roads to identify signal references
 					for(const opendrive::RoadInformation &road : odr->roads)
@@ -1194,7 +1318,11 @@ std::vector<TrafficSign> OpenDriveMapLoader::GetTrafficSignsList(const opendrive
 						{
 							for(int i = 0; i < road.traffic_signal_references.size(); i++)
 							{	
-								if(tl.id == (10 + road.traffic_signal_references.at(i).id * 10))
+								OpenDriveMapLoader::openDriveLaneId ref_id;
+								ref_id.roadId = road.traffic_signal_references.at(i).id;
+								ref_id.laneSectionId = 0;
+								ref_id.laneId = 0;
+								if(tl.id == openDriveIDsToInt(ref_id))
 								{
 									// get the current road's lane id
 									int laneId = 0;
@@ -1224,8 +1352,12 @@ std::vector<TrafficSign> OpenDriveMapLoader::GetTrafficSignsList(const opendrive
 									}
 
 									if(laneId != 0)
-									{										
-										tl.laneIds.push_back(10 + road.attributes.id * 10 + laneId);
+									{		
+										OpenDriveMapLoader::openDriveLaneId l_id;
+										l_id.roadId = road.attributes.id;
+										l_id.laneSectionId = 0;
+										l_id.laneId = laneId;
+										tl.laneIds.push_back(openDriveIDsToInt(l_id));
 										tl.stopLineID = tl.id;
 
 										if(tl.laneIds.size() > 0 && tl.stopLineID != 0)
@@ -1386,63 +1518,66 @@ std::vector<Curb> OpenDriveMapLoader::GetCurbsList(const opendrive::OpenDriveDat
 	// first iteration connect everyting based on ids
 	for(const opendrive::RoadInformation &road : odr->roads)
     {
-		for (int i = 0; i < road.lanes.lane_sections.size(); i++) {
+		for (int sectionIndex = 0; sectionIndex < road.lanes.lane_sections.size(); sectionIndex++) {
 			double endPosition = 0; 
-			if(i < road.lanes.lane_sections.size()-1)
+			if(sectionIndex < road.lanes.lane_sections.size()-1)
 			{
-				endPosition = road.lanes.lane_sections[i+1].start_position;
+				endPosition = road.lanes.lane_sections[sectionIndex+1].start_position;
 			}
 			else
 			{
 				endPosition = road.attributes.length;
 			}
-			for(const opendrive::LaneInfo &laneInfoRight : road.lanes.lane_sections[i].right)
+			for(const opendrive::LaneInfo &laneInfoRight : road.lanes.lane_sections[sectionIndex].right)
 			{
-				if(	laneInfoRight.attributes.type == opendrive::LaneType::Driving
-					|| laneInfoRight.attributes.type == opendrive::LaneType::Sidewalk
-					|| laneInfoRight.attributes.type == opendrive::LaneType::Shoulder)
+				int marker_size = laneInfoRight.road_marker.size();
+				if(marker_size > 0 && sectionIndex == 0) 
 				{
-					int marker_size = laneInfoRight.road_marker.size();
-					if(marker_size > 0) {
-						for ( int i = 0; i < marker_size; i++ ) {
-							if(laneInfoRight.road_marker.at(i).type == "curb") {
-								Curb c;
-								c.id 		= 10 + road.attributes.id * 10 + laneInfoRight.attributes.id;
-								c.laneId 	= 10 + road.attributes.id * 10 + laneInfoRight.attributes.id;
-								c.roadId 	= 0;
-								c.width		= laneInfoRight.road_marker.at(i).width;
-								c.height	= 0.15;
-								c.points	= GetLaneData(odr, &road, &laneInfoRight, road.lanes.lane_sections[i].start_position, endPosition, 1.0);
+					for ( int j = 0; j < marker_size; j++ ) 
+					{
+						if(laneInfoRight.road_marker.at(j).type == "curb") 
+						{
+							OpenDriveMapLoader::openDriveLaneId c_id;
+							c_id.roadId = road.attributes.id;
+							c_id.laneSectionId = sectionIndex;
+							c_id.laneId = laneInfoRight.attributes.id;
+							Curb c;
+							c.id 		= openDriveIDsToInt(c_id);
+							c.laneId 	= openDriveIDsToInt(c_id);
+							c.roadId 	= 0;
+							c.width		= laneInfoRight.road_marker.at(j).width;
+							c.height	= 0.15;
+							c.points	= GetLaneData(odr, &road, &laneInfoRight, road.lanes.lane_sections[sectionIndex].start_position, endPosition, 1.0);
 
-								cList.push_back(c);
-							}
+							cList.push_back(c);
 						}
 					}
 				}
 			}
-			for(const opendrive::LaneInfo &laneInfoLeft : road.lanes.lane_sections[i].left)
+			for(const opendrive::LaneInfo &laneInfoLeft : road.lanes.lane_sections[sectionIndex].left)
 			{
-				if(	laneInfoLeft.attributes.type == opendrive::LaneType::Driving
-					|| laneInfoLeft.attributes.type == opendrive::LaneType::Sidewalk
-					|| laneInfoLeft.attributes.type == opendrive::LaneType::Shoulder)
+				int marker_size = laneInfoLeft.road_marker.size();
+				if(marker_size > 0 && sectionIndex == 0)
 				{
-					int marker_size = laneInfoLeft.road_marker.size();
-					if(marker_size > 0) {
-						for ( int i = 0; i < marker_size; i++ ) {
-							if(laneInfoLeft.road_marker.at(i).type == "curb") {
-								Curb c;
-								c.id 		= 10 + road.attributes.id * 10 + laneInfoLeft.attributes.id;
-								c.laneId 	= 10 + road.attributes.id * 10 + laneInfoLeft.attributes.id;
-								c.roadId 	= 0;
-								c.width		= laneInfoLeft.road_marker.at(i).width;
-								c.height	= 0.15;
-								c.points	= GetLaneData(odr, &road, &laneInfoLeft, road.lanes.lane_sections[i].start_position, endPosition, 1.0);
+					for ( int j = 0; j < marker_size; j++ ) 
+					{
+						if(laneInfoLeft.road_marker.at(j).type == "curb") 
+						{
+							OpenDriveMapLoader::openDriveLaneId c_id;
+							c_id.roadId = road.attributes.id;
+							c_id.laneSectionId = sectionIndex;
+							c_id.laneId = laneInfoLeft.attributes.id;
+							Curb c;
+							c.id 		= openDriveIDsToInt(c_id);
+							c.laneId 	= openDriveIDsToInt(c_id);
+							c.roadId 	= 0;
+							c.width		= laneInfoLeft.road_marker.at(j).width;
+							c.height	= 0.15;
+							c.points	= GetLaneData(odr, &road, &laneInfoLeft, road.lanes.lane_sections[sectionIndex].start_position, endPosition, 1.0);
 
-								cList.push_back(c);
-							}
+							cList.push_back(c);
 						}
 					}
-					
 				}
 			}
 		}
@@ -1485,10 +1620,37 @@ std::vector<opendrive::LaneWidth> OpenDriveMapLoader::GetLaneWidths(	const opend
 							{
 								laneIdWidth idW;
 								idW.laneWidth.soffset = laneWidth.soffset + startPosition;
-								idW.laneWidth.a = laneWidth.a * factor;
-								idW.laneWidth.b = laneWidth.b * factor;
-								idW.laneWidth.c = laneWidth.c * factor;
-								idW.laneWidth.d = laneWidth.d * factor;
+								if(startPosition > 0 && laneWidth.soffset == 0 && abs(laneInfoLeft.attributes.id) > 1)
+								{
+									// Getting the lane width of the lane one index closer to the center line: 
+									double aOneBelow = 0;
+									for(const opendrive::LaneInfo &laneInfoLeftOneBelowLoop : laneSection.right)
+									{
+										if(abs(laneInfoLeftOneBelowLoop.attributes.id) == (abs(laneInfo->attributes.id) - 1) ) 
+										{
+											for(const opendrive::LaneWidth &laneWidth : laneInfoLeftOneBelowLoop.lane_width)
+											{
+												if(laneWidth.soffset == 0)
+												{
+													aOneBelow = laneWidth.a;
+												}
+											}
+										}
+									}
+									
+									idW.laneWidth.a = ( -1 * aOneBelow) * factor;
+									idW.laneWidth.b = laneWidth.b;
+									idW.laneWidth.c = laneWidth.c;
+									idW.laneWidth.d = laneWidth.d;
+								}
+								else
+								{
+									idW.laneWidth.a = laneWidth.a * factor;
+									idW.laneWidth.b = laneWidth.b * factor;
+									idW.laneWidth.c = laneWidth.c * factor;
+									idW.laneWidth.d = laneWidth.d * factor;
+								}
+								
 								idW.id = laneInfoLeft.attributes.id;
 
 								widths.push_back(idW);
@@ -1527,10 +1689,37 @@ std::vector<opendrive::LaneWidth> OpenDriveMapLoader::GetLaneWidths(	const opend
 							{
 								laneIdWidth idW;
 								idW.laneWidth.soffset = laneWidth.soffset + startPosition;
-								idW.laneWidth.a = laneWidth.a * factor;
-								idW.laneWidth.b = laneWidth.b * factor;
-								idW.laneWidth.c = laneWidth.c * factor;
-								idW.laneWidth.d = laneWidth.d * factor;
+								if(startPosition > 0 && laneWidth.soffset == 0 && abs(laneInfoRight.attributes.id) > 1)
+								{
+									// Getting the lane width of the lane one index closer to the center line: 
+									double aOneBelow = 0;
+									for(const opendrive::LaneInfo &laneInfoRightOneBelowLoop : laneSection.right)
+									{
+										if(abs(laneInfoRightOneBelowLoop.attributes.id) == (abs(laneInfo->attributes.id) - 1) ) 
+										{
+											for(const opendrive::LaneWidth &laneWidth : laneInfoRightOneBelowLoop.lane_width)
+											{
+												if(laneWidth.soffset == 0)
+												{
+													aOneBelow = laneWidth.a;
+												}
+											}
+										}
+									}
+									
+									idW.laneWidth.a = ( -1 * aOneBelow) * factor;
+									idW.laneWidth.b = laneWidth.b;
+									idW.laneWidth.c = laneWidth.c;
+									idW.laneWidth.d = laneWidth.d;
+								}
+								else
+								{
+									idW.laneWidth.a = laneWidth.a * factor;
+									idW.laneWidth.b = laneWidth.b * factor;
+									idW.laneWidth.c = laneWidth.c * factor;
+									idW.laneWidth.d = laneWidth.d * factor;
+								}
+								
 								idW.id = laneInfoRight.attributes.id;
 
 								widths.push_back(idW);
@@ -1686,7 +1875,6 @@ std::vector<Boundary> OpenDriveMapLoader::GetBoundariesList(const opendrive::Ope
 	// loop trough all junctions in odr map
 	for(const opendrive::Junction &junction : odr->junctions)
 	{
-		//TODO: create Boundaries around all junctions 
 		/*
 			Therefore loop through all roads inside the junction.
 			Then construct a polygon around the junction.
@@ -1793,27 +1981,15 @@ bool OpenDriveMapLoader::isPointLeftOfLine(PlannerHNS::WayPoint A, PlannerHNS::W
 	return isLeft;
 }
 
-// int OpenDriveMapLoader::openDriveIDsToInt(int roadId, int laneSectionId, int laneId)
-// {
-// 	// line is defined by A and B
-// 	// M is the point to check
-// 	bool isLeft = false;
-
-// 	double determinantABAM = (B.pos.x - A.pos.x) * (M.pos.y - A.pos.y) - (B.pos.y - A.pos.y) * (M.pos.x - A.pos.x);
-// 	if(determinantABAM > 0)
-// 		isLeft = true;
-// 	return isLeft;
-// }
-// int OpenDriveMapLoader::intToOpenDriveIDs(PlannerHNS::WayPoint A, PlannerHNS::WayPoint B, PlannerHNS::WayPoint M)
-// {
-// 	// line is defined by A and B
-// 	// M is the point to check
-// 	bool isLeft = false;
-
-// 	double determinantABAM = (B.pos.x - A.pos.x) * (M.pos.y - A.pos.y) - (B.pos.y - A.pos.y) * (M.pos.x - A.pos.x);
-// 	if(determinantABAM > 0)
-// 		isLeft = true;
-// 	return isLeft;
-// }
+int OpenDriveMapLoader::openDriveIDsToInt(OpenDriveMapLoader::openDriveLaneId id)
+{
+	uint64_t laneIDMask = 255;
+	return (int)(id.roadId << 16 | id.laneSectionId << 8 | (id.laneId & laneIDMask));
+}
+OpenDriveMapLoader::openDriveLaneId OpenDriveMapLoader::intToOpenDriveIDs(int id)
+{
+	openDriveLaneId returnId;
+	return returnId;
+}
 
 } /* namespace PlannerHNS */
