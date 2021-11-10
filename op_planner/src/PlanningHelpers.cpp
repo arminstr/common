@@ -1657,82 +1657,6 @@ void PlanningHelpers::SmoothPath(vector<GPSPoint>& path, double weight_data,
 	path = smoothPath_out;
 }
 
-
-// we compare two specific trajectories in order to find possible conflict/collision points
-void PlanningHelpers::PredictDynamicEgoCollision(
-	std::vector<PlannerHNS::WayPoint>& egoPath,
-	std::vector<PlannerHNS::WayPoint>& obstaclePath,
-	const double collisionTimeWindow,
-	const double collisionDistance)
-{
-	// create obstacle to save the costs
-	std::vector<PlannerHNS::WayPoint>  tempObstacleCostPath;
-	for (int obstaclePose=0; obstaclePose < obstaclePath.size() ; obstaclePose++){
-		PlannerHNS::WayPoint newWaypoint;
-		tempObstacleCostPath.push_back(newWaypoint);
-		tempObstacleCostPath.at(obstaclePose).timeCost = 999;
-	}
-
-
-
-	if(egoPath.size() == 0 || obstaclePath.size() == 0) {
-		std::cout << "Path empty!" << std::endl;
-		return;
-	}
-
-
-	// iterate over all future ego poses
-	for(int egoPose=0; egoPose<egoPath.size(); egoPose++){
-		// iterate over all future obstacle poses
-		for (int obstaclePose=0; obstaclePose<obstaclePath.size(); obstaclePose++){
-
-			// check for invalid time steps
-			if (obstaclePath.at(obstaclePose).timeCost == -1){
-				// std::cout << "INVALID TIME COST AT OBSTACLE!" << std::endl;
-				continue;
-			}
-			if (egoPath.at(egoPose).timeCost == -1){
-				// std::cout << "INVALID TIME COST AT EGO!" << std::endl;
-				continue;
-			}
-			// check time overlap for relevance of the obstacle
-			double timeDiff = abs(egoPath.at(egoPose).timeCost - obstaclePath.at(obstaclePose).timeCost);
-
-			if (timeDiff < collisionTimeWindow) {
-				// egoPath.at(egoPose).timeCost = 999;
-				double distance = hypot(
-					obstaclePath.at(obstaclePose).pos.x - egoPath.at(egoPose).pos.x,
-					obstaclePath.at(obstaclePose).pos.y - egoPath.at(egoPose).pos.y);
-
-				// check if object is close enough to be considered
-				if (distance < collisionDistance){
-
-					// check if current cost is smaller than the latest one found
-					if (timeDiff < tempObstacleCostPath.at(obstaclePose).timeCost)
-						tempObstacleCostPath.at(obstaclePose).timeCost = timeDiff;
-
-					// std::cout << "TimeDiff: "<<timeDiff<<"=abs("<<egoPath.at(egoPose).timeCost<<"-"<<obstaclePath.at(obstaclePose).timeCost<<")"<<std::endl;
-					// std::cout << "-> Possible collision at " << timeDiff << "s with "<< distance << "m" <<std::endl;
-					// std::cout << "-> Possible collision at x:" << obstaclePath.at(obstaclePose).pos.x << " y:"<< obstaclePath.at(obstaclePose).pos.x << "m" <<std::endl;
-				} 
-			} 
-			// else {
-				// obstaclePath.at(obstaclePose).timeCost = 999;
-				// std::cout << "setting new time cost 999 at Pose " << obstaclePose << std::endl;
-			// } 
-
-		}
-	}
-
-	// save final time costs
-	for (int obstaclePose=0; obstaclePose < tempObstacleCostPath.size() ; obstaclePose++){
-		obstaclePath.at(obstaclePose).timeCost = tempObstacleCostPath.at(obstaclePose).timeCost;
-	}
-
-	return;
-}
-
-
 void PlanningHelpers::PredictConstantTimeCostForTrajectory(std::vector<PlannerHNS::WayPoint>& path, const PlannerHNS::WayPoint& currPose, const double& minVelocity, const double& minDist)
 {
 	if(path.size() == 0) return;
@@ -2699,40 +2623,21 @@ void PlanningHelpers::GenerateRecommendedSpeed(vector<WayPoint>& path, const dou
 	SmoothSpeedProfiles(path, 0.4,0.3, 0.01);
 }
 
-std::vector<double> PlanningHelpers::GetACCVelocityModelBased(const double& dt, 
-	const double& CurrSpeed, 
-	const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
-	const PlannerHNS::ControllerParams& ctrlParams, 
-	const PlannerHNS::BehaviorState& CurrBehavior, 
-	PlannerHNS::PlanningParams& m_params,
-	std::vector<std::vector<PlannerHNS::WayPoint>> total_path)
+double PlanningHelpers::GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
+		const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params)
 {
-	static double previousVelocity;
-
-	std::vector<double> VelArray;
-
-	if (total_path.size() == 0){
-		VelArray.push_back(-1);
-
-	}
-
-	if (total_path.at(0).size() == 0){
-		return VelArray;
-	}
-
-	unsigned int pathLength = total_path.at(0).size();
-	
-	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5,pathLength);
-	ACC_helper.prevVelocity = previousVelocity;
-
+	ACCHelper ACC_helper(dt,CurrSpeed,vehicleInfo,ctrlParams,CurrBehavior,m_params,0.5);
 	double desiredVel, control_distance, isStopLine;	
+	static double previousVelocity;
+	const double velocity_control_error_multiplier = 5.0;
+	const double max_speed_difference = vehicleInfo.max_acceleration * dt * velocity_control_error_multiplier; 
 
 	if(CurrBehavior.state == FORWARD_STATE || CurrBehavior.state == OBSTACLE_AVOIDANCE_STATE )
 	{
 		if (CurrSpeed < CurrBehavior.maxVelocity){
-			VelArray = ACC_helper.smoothAcceleration();
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
 		} else {
-			VelArray = ACC_helper.setMaxVelocity();
+			desiredVel = CurrBehavior.maxVelocity;
 		}
 	}
 	else if(CurrBehavior.state == STOPPING_STATE || CurrBehavior.state == TRAFFIC_LIGHT_STOP_STATE || CurrBehavior.state == STOP_SIGN_STOP_STATE)
@@ -2745,64 +2650,51 @@ std::vector<double> PlanningHelpers::GetACCVelocityModelBased(const double& dt,
 		{
 			isStopLine = true;
 			control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.stopLineDistance, isStopLine);
-			
-			if (control_distance > -2.0){
-				VelArray = ACC_helper.smoothStop();
-			} else {
-				double targetVel = ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
-				VelArray = ACC_helper.setStaticVelocity(targetVel);
-			}
+			desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
 		} 
 		else 
 		// Stopping behind a vehicle in front of us, which is waiting at the stopline (FOLLOW MODE)
 		{
 			isStopLine = false;
 			control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.followDistance, isStopLine);
-			
-			if (control_distance > -2.0){
-				VelArray = ACC_helper.smoothStop();
-			} else {
-				double targetVel = ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
-				VelArray = ACC_helper.setStaticVelocity(targetVel);
-			}
+			desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
 		}
 	}
 	else if(CurrBehavior.state == YIELDING_STATE )
 	{
-
-		if (CurrBehavior.followDistance < 5.0){
-			// desiredVel = 0;
-			VelArray = ACC_helper.smoothStop(); // testing
-		} else{
-			VelArray = ACC_helper.smoothStop();
-		}
+		desiredVel = ACC_helper.smoothStop(previousVelocity);
 	}
 	else if(CurrBehavior.state == FOLLOW_STATE)
 	{
 		isStopLine = false;
-		control_distance = 		ACC_helper.calcControlDistance(CurrBehavior.followDistance,isStopLine);
-		double targetVelocity = ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
-		if (CurrSpeed<targetVelocity){
-			VelArray = ACC_helper.smoothAcceleration();
+		control_distance = 	ACC_helper.calcControlDistance(CurrBehavior.followDistance,isStopLine);
+		desiredVel = 		ACC_helper.applyACCcontrolGain(control_distance, isStopLine);
+		if (CurrSpeed<desiredVel){
+			desiredVel = ACC_helper.smoothAcceleration(previousVelocity);
 		} else {
-			VelArray = ACC_helper.smoothStop(); // maybe wrong implementation for the behavior
+			//NOP
 		}
 
 	}
 	else
 	{
-	 	VelArray.push_back(0);
+	 	desiredVel = 0;
 	}
 
-	VelArray = ACC_helper.limitVelocity(VelArray);
+	desiredVel = ACC_helper.limitVelocity(desiredVel);
 
-	previousVelocity = ACC_helper.prevVelocity;
-
-	for (int i=0; i <pathLength; i++){
-		std::cout << VelArray.at(i) << std::endl;
+	if(abs(previousVelocity - desiredVel) > max_speed_difference){
+		std::cout << "++ Check control Paremeters. Control difference to HIGH!" << std::endl;
+		std::cout << "max_speed_difference: 		" << max_speed_difference << std::endl;
+		std::cout << "current speed difference: 	" << abs(previousVelocity - desiredVel) << std::endl;
+		// velocity controller error occured
+		previousVelocity = 0.0;
 	}
-	return VelArray;
-
+	else {
+		previousVelocity = desiredVel;
+	}
+	
+	return desiredVel;
 }
 
 double ACCHelper::applyACCcontrolGain(double controlDistance, bool isStopLine){
@@ -2828,81 +2720,34 @@ double ACCHelper::calcControlDistance(double stopDistance, bool isStopLine){
 	return temp_distance;
 }
 
-std::vector<double> ACCHelper::smoothStop(){
+double ACCHelper::smoothStop(double previousVelocity){
 	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
-	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
-	std::vector<double> speedProfile;
 
-	// get initial/current speed
-	speedProfile.push_back(this->prevVelocity);
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_deceleration/2)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
 
-	// calculate speed profile (longitudinal only, because lateral is cut in global plan already)
-	for(int i=1;i<pathLength;i++){ // skip the first loop because this is our initial velocity
-		double prevVel = speedProfile.at(i-1);
-		double nextVel = sqrt(2*vehicleInfo.max_acceleration*m_params.pathDensity+prevVel*prevVel);
-		speedProfile.push_back(nextVel);
-	}
-
-	this->prevVelocity = this->prevVelocity + (vehicleInfo.max_acceleration)*this->dt;
-	return speedProfile;
+	return desiredVelocity;
 }
 
-
-std::vector<double> ACCHelper::smoothAcceleration(){
-	// start acceleration (Stop recalculating the trajectory)
-	std::vector<double> speedProfile;
-
-	// get initial/current speed
-	speedProfile.push_back(this->prevVelocity);
-
-	// calculate speed profile (longitudinal only, because lateral is cut in global plan already)
-	for(int i=1;i<pathLength;i++){ // skip the first loop because this is our initial velocity
-		double prevVel = speedProfile.at(i-1);
-		double nextVel = sqrt(2*vehicleInfo.max_acceleration*m_params.pathDensity+prevVel*prevVel);
-		speedProfile.push_back(nextVel);
-	}
-
-	this->prevVelocity = this->prevVelocity + (vehicleInfo.max_acceleration)*this->dt;
-	return speedProfile;
-}
-
-std::vector<double> ACCHelper::setMaxVelocity(){
-
+double ACCHelper::smoothAcceleration(double previousVelocity){
 	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
-	std::vector<double> speedProfile;
 
-	for(int i=0;i<pathLength;i++){ // skip the first loop because this is our initial velocity
-		speedProfile.push_back(CurrBehavior.maxVelocity);
-	}
+	double desiredVelocity = previousVelocity + (vehicleInfo.max_acceleration)*dt;
+	// std::cout << "max_deceleration|dt: " << vehicleInfo.max_deceleration << "|" << dt << std::endl;
 
-	this->prevVelocity = CurrBehavior.maxVelocity;
-	return speedProfile;
+	return desiredVelocity;
 }
 
-std::vector<double> ACCHelper::setStaticVelocity(double staticVel){
-	// start deceleration to fullstop with max decelration. (Stop recalculating the braking trajectory)
-	std::vector<double> speedProfile;
-
-	for(int i=0;i<pathLength;i++){ // skip the first loop because this is our initial velocity
-		speedProfile.push_back(staticVel);
+double ACCHelper::limitVelocity(double desiredVel){
+	if(desiredVel > CurrBehavior.maxVelocity)
+	{
+		desiredVel = CurrBehavior.maxVelocity;
 	}
-
-	this->prevVelocity = staticVel;
-	return speedProfile;
-}
-
-std::vector<double> ACCHelper::limitVelocity(std::vector<double> speedProfile){
-	for (int i=0;i<pathLength;i++){
-		if(speedProfile.at(i) > CurrBehavior.maxVelocity)
-		{
-			speedProfile.at(i) = CurrBehavior.maxVelocity;
-		}
-		else if(speedProfile.at(i) < 0)
-		{
-			speedProfile.at(i) = 0;
-		}
+	else if(desiredVel < 0)
+	{
+		desiredVel = 0;
 	}
-	return speedProfile;
+	return desiredVel;
 }
 
 double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine){
@@ -2922,9 +2767,7 @@ double ACCHelper::closeGapToStop(double currentDesiredVelocity, double stopDista
 
 bool ACCHelper::isObjectAhead(){
 	// if there is no vehicle in the horizon 
-	if (   CurrBehavior.followDistance == m_params.horizonDistance
-		|| CurrBehavior.followDistance <= 0.01) 
-		return false;
+	if (CurrBehavior.followDistance == m_params.horizonDistance) return false;
 	else return true;
 }
 

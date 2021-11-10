@@ -35,11 +35,11 @@ public:
 	{
 		_bLaneStitch = true;
 	}
-	// struct openDriveLaneId {
-	// 	int roadId;
-	// 	int laneSectionId;
-	// 	int laneId;
-	// };
+	struct openDriveLaneId {
+		uint16_t roadId;
+		uint8_t laneSectionId;
+		int8_t laneId;
+	};
 
 	std::vector<Lane> GetLanesList(const opendrive::OpenDriveData* odr);
 	std::vector<Curb> GetCurbsList(const opendrive::OpenDriveData* odr);
@@ -48,15 +48,17 @@ public:
 	std::vector<TrafficLight> GetTrafficLightsList(const opendrive::OpenDriveData* odr);
 	std::vector<TrafficSign> GetTrafficSignsList(const opendrive::OpenDriveData* odr);
 	std::vector<RoadSegment> GetRoadSegmentsList(const opendrive::OpenDriveData* odr);
-	Lane GetLaneInfo(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo, double startPosition, double endPosition);
+	Lane GetLaneInfo(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, uint8_t laneSectionId, const opendrive::LaneInfo* laneInfo, double startPosition, double endPosition);
 	std::vector<int> GetFromIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo);
-	std::vector<int> GetToIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo);
+	std::vector<int> GetToIDs(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, uint8_t laneSectionId, const opendrive::LaneInfo* laneInfo);
 	std::vector<WayPoint> GetLaneData(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo, double startPosition, double endPosition, double factor);
 	PlannerHNS::WayPoint GeneratePointFromLine(const opendrive::GeometryAttributesLine *line, const opendrive::RoadInformation* road, const std::vector<opendrive::LaneWidth> width, int laneId, unsigned int waypointId, int sideId, double sOffset, double ds);
 	PlannerHNS::WayPoint GeneratePointFromArc(const opendrive::GeometryAttributesArc *arc, const opendrive::RoadInformation* road, const std::vector<opendrive::LaneWidth> width, int laneId, unsigned int waypointId, int sideId, double sOffset, double ds);
 	std::vector<opendrive::LaneWidth> GetLaneWidths(const opendrive::OpenDriveData* odr, const opendrive::RoadInformation* road, const opendrive::LaneInfo* laneInfo, double startPosition, double factor);
 	int FindLeftmostPointInJunctionPointsIndex(std::vector<PlannerHNS::WayPoint>& points);
 	bool isPointLeftOfLine(PlannerHNS::WayPoint p0, PlannerHNS::WayPoint p1, PlannerHNS::WayPoint p2);
+	int openDriveIDsToInt(openDriveLaneId id);
+	openDriveLaneId intToOpenDriveIDs(int id);
 
 private:
 	PlannerHNS::RoadNetwork* _pMap;
