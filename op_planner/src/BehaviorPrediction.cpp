@@ -352,7 +352,7 @@ void BehaviorPrediction::CalculateCollisionTimes(const double& minSpeed)
 					m_EgoInfo.at(0)->obj.predTrajectories.at(0),
 					m_ParticleInfo.at(ParticleCnt)->obj.predTrajectories.at(trajectoryCnt),
 					5.0,
-					10.0);
+					5.0);
 			}
 		}
 		else {

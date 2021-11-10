@@ -143,8 +143,13 @@ public:
 	 * @param CurrBehavior uses (state, max_velocity, stop_distance, follow_distance)
 	 * @return
 	 */
-	static double GetACCVelocityModelBased(const double& dt, const double& CurrSpeed, const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
-			const PlannerHNS::ControllerParams& ctrlParams, const PlannerHNS::BehaviorState& CurrBehavior, PlannerHNS::PlanningParams& m_params);
+	static std::vector<double> GetACCVelocityModelBased(const double& dt, 
+		const double& CurrSpeed, 
+		const PlannerHNS::CAR_BASIC_INFO& vehicleInfo,
+		const PlannerHNS::ControllerParams& ctrlParams, 
+		const PlannerHNS::BehaviorState& CurrBehavior, 
+		PlannerHNS::PlanningParams& m_params,
+		std::vector<std::vector<PlannerHNS::WayPoint>> total_path);
 
 	static void ShiftRecommendedSpeed(std::vector<WayPoint>& path, const double& max_speed, const double& curr_speed, const double& inc_ratio, const double& path_density);
 
@@ -268,6 +273,8 @@ class ACCHelper{
 	const PlannerHNS::BehaviorState& CurrBehavior;
 	const PlannerHNS::PlanningParams& m_params;
 	const double ACCcontrolgain;
+	const int pathLength;
+	double prevVelocity;
 	
 
 	ACCHelper(const double& dt, 
@@ -276,26 +283,30 @@ class ACCHelper{
 		const PlannerHNS::ControllerParams& ctrlParams,
 		const PlannerHNS::BehaviorState& CurrBehavior,
 		const PlannerHNS::PlanningParams& m_params,
-		const double ACCcontrolgain): 
+		const double ACCcontrolgain,
+		const int pathLength): 
 			dt(dt),
 			CurrSpeed(CurrSpeed),
 			vehicleInfo(vehicleInfo),
 			ctrlParams(ctrlParams),
 			CurrBehavior(CurrBehavior),
 			m_params(m_params),
-			ACCcontrolgain(ACCcontrolgain){}
+			ACCcontrolgain(ACCcontrolgain),
+			pathLength(pathLength){}
 
 	double evaluateTargetAccleration(double distance_to_follow);
-	double limitVelocity(double desiredVel);
+	std::vector<double> limitVelocity(std::vector<double> speedProfile);
 	double applyPushFactors(double target_a);
 	double evaluateDesiredVelocity(double target_a);
 	double slowDownInCurve(double target_a);
 	bool isObjectAhead();
-	double smoothStop(double previousVelocity);
-	double smoothAcceleration(double previousVelocity);
+	std::vector<double> smoothStop();
+	std::vector<double> smoothAcceleration();
 	double closeGapToStop(double currentDesiredVelocity, double stopDistance, bool isStopLine);
 	double calcControlDistance(double stopDistance,bool isStopLine);
 	double applyACCcontrolGain(double controlDistance,bool isStopLine);
+	std::vector<double> setMaxVelocity();
+	std::vector<double> setStaticVelocity(double staticVel);
 
 
 

@@ -112,8 +112,8 @@ void OpenDriveMapLoader::LoadXODR(std::string const &file, RoadNetwork& map)
 	map.boundaries = boundaries;
 
 	// std::cout << " >> Link Boundaries and Waypoints ... " << std::endl;
-	// MappingHelpers::ConnectBoundariesToWayPoints(map);
-	// MappingHelpers::LinkBoundariesToWayPoints(map);
+	MappingHelpers::ConnectBoundariesToWayPoints(map);
+	MappingHelpers::LinkBoundariesToWayPoints(map);
 
 	MappingHelpers::LinkTrafficLightsIntoGroups(map);
 	MappingHelpers::ConnectTrafficLightsAndStopLines(map);
