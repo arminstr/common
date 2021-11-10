@@ -516,7 +516,9 @@ void MotionControl::VelocityControllerUpdateUsingACC(const double& dt, const Pla
 		const PlannerHNS::BehaviorState& CurrBehavior, double& desiredVelocity, PlannerHNS::SHIFT_POS& desiredShift)
 {
 	PlannerHNS::PlanningParams m_planningParams;
-	desiredVelocity = PlanningHelpers::GetACCVelocityModelBased(dt, CurrStatus.speed, m_VehicleInfo, m_Params, CurrBehavior, m_planningParams);
+	// legacy
+	// desiredVelocity = PlanningHelpers::GetACCVelocityModelBased(dt, CurrStatus.speed, m_VehicleInfo, m_Params, CurrBehavior, m_planningParams,m_);
+	desiredVelocity = 0;
 	desiredShift = PlannerHNS::SHIFT_POS_DD;
 
 	//desiredVelocity = m_VehicleInfo.max_speed_forward;

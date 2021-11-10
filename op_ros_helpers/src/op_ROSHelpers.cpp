@@ -512,8 +512,10 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(
 			point.z = paths.at(i).at(p).pos.z + additional_z;
 
 			visualization_msgs::Marker circle_mkr;
-			if (paths.at(i).at(p).timeCost == 999)
+			if (paths.at(i).at(p).timeCost == 999){
+				continue; // for testing to reduce the amount of plotted points!
 				circle_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::CYLINDER);
+			}				
 			else 
 				circle_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,1,0,0,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::CYLINDER);
 			
@@ -538,8 +540,10 @@ void ROSHelpers::ConvertPredictedTrqajectoryMarkers(
 			str_out << paths.at(i).at(p).timeCost;
 
 			visualization_msgs::Marker txt_mkr;
-			if (paths.at(i).at(p).timeCost == 999)
+			if (paths.at(i).at(p).timeCost == 999){
+				continue; // for testing
 				txt_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,r,g,b,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::TEXT_VIEW_FACING);
+			}				
 			else
 				txt_mkr = CreateGenMarker(point.x,point.y,point.z,0.4,1,0,0,0.5,iCount,"Predicted_Trajectories", visualization_msgs::Marker::TEXT_VIEW_FACING);
 
@@ -1132,7 +1136,10 @@ void ROSHelpers::TrajectoriesToMarkers(const std::vector<std::vector<std::vector
 void ROSHelpers::TrajectorySelectedToMarkers(const std::vector<PlannerHNS::WayPoint>& path, const double& r_path, const double& g_path,
 		const double& b_path, const double& r_circle, const double& g_circle, const double& b_circle, const double& radius, visualization_msgs::MarkerArray& markerArray, int skip)
 {
-	visualization_msgs::Marker path_part, circle_part;
+	visualization_msgs::Marker path_part, circle_part, text_part;
+
+
+	// ---add path marker---
 
 	int count = 0;
 	path_part = CreateGenMarker(0,0,0,0,r_path,g_path,b_path,1.5,count,"Path_Part", visualization_msgs::Marker::LINE_STRIP);
@@ -1155,17 +1162,21 @@ void ROSHelpers::TrajectorySelectedToMarkers(const std::vector<PlannerHNS::WayPo
 
 		  i += skip;
 
-//		  std::ostringstream str_out;
-//		  str_out.precision(3);
-//		  str_out << path.at(i).timeCost;
-//			visualization_msgs::Marker txt_mkr = CreateGenMarker(point.x,point.y-0.5,point.z+0.1,0.4,0.8,0.8,0.8,0.5,count,"test_part", visualization_msgs::Marker::TEXT_VIEW_FACING);
-//			txt_mkr.text = str_out.str();
-//			markerArray.markers.push_back(txt_mkr);
-//			count++;
+		  std::ostringstream str_out;
+		  str_out.precision(3);
+		  str_out << path.at(i).v;
+			visualization_msgs::Marker txt_mkr = CreateGenMarker(point.x,point.y-0.5,point.z+0.1,0.4,0.8,0.8,0.8,0.5,count,"test_part", visualization_msgs::Marker::TEXT_VIEW_FACING);
+			txt_mkr.text = str_out.str();
+			markerArray.markers.push_back(txt_mkr);
+			count++;
 	}
-
-
 	markerArray.markers.push_back(path_part);
+
+
+	// ---add text markers---
+
+
+
 }
 
 void ROSHelpers::TrajectorySelectedToCircles(const std::vector<PlannerHNS::WayPoint>& path, const double& r_path, const double& g_path,

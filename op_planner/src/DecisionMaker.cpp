@@ -214,8 +214,9 @@ void DecisionMaker::InitBehaviorStates()
 
 	if(beh.boundaryType == INTERSECTION_BOUNDARY) {
 		pValues->bInsideIntersection = true;
-	} else 
+	} else {
 		pValues->bInsideIntersection = false; // always in an intersection (ToDo Armin Map loader)
+	}
 
  	if(m_CarInfo.max_deceleration != 0){ 
 		double systemDelay = 2; // brake control latency in seconds
@@ -650,20 +651,27 @@ void DecisionMaker::CheckForCurveZone(const VehicleState& vehicleState, double& 
 	
 	//VehicleState desired_state =  m_VelocityController.DoOneStep(dt, beh_with_max, CurrStatus);
 	
-	double target_velocity = PlanningHelpers::GetACCVelocityModelBased(dt, 
+	std::vector<double> target_velocity = PlanningHelpers::GetACCVelocityModelBased(dt, 
 															CurrStatus.speed, 
 															m_CarInfo, 
 															m_ControlParams, 
 															beh_with_max,
-															m_params);
+															m_params,
+															m_TotalPaths);
 
 	for(unsigned int i =  0; i < m_Path.size(); i++)
 	{
-		m_Path.at(i).v = target_velocity;
-		// ?????????????????? The reason for this function ist not reasonable, because the speed profile is already determined for the track.  
+		if (i >= target_velocity.size())
+			continue;
+		std::cout << i << std::endl;
+		m_Path.at(i).v = target_velocity.at(i);
 	}
-	
-	return target_velocity;
+	// velocity target point distance
+	double distanceToTargetSpeed = 0.5*m_CarInfo.max_acceleration*dt*dt; 
+	// Speed array position
+	unsigned int velArrayPos = ceil(distanceToTargetSpeed/m_params.pathDensity);
+
+	return target_velocity.at(velArrayPos);
  }
  
  double DecisionMaker::UpdateVelocityDirectlyToTrajectory(const BehaviorState& beh, const VehicleState& CurrStatus, const double& dt)
